@@ -1,0 +1,301 @@
+---
+title: "Adjusted Analyses-Interactions"
+author: "JAS, building off code by Mehr"
+date: "2/12/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# install.packages("sandwich")
+# install.packages("lmtest")
+library(sandwich)
+library(lmtest)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Instructions for Creating Needed Code
+
+Initial code for one outcome, one pollutant during Phase1 is included below. We need crude models for the rest of th pollutants, phases and subsets. Then, they will need to be compiled into a Table for the Supplement.
+
+Using the example code, you can cut/paste and replace the pollutant, dataset and rename output objects so that all can be output together into a file.
+
+1. Need to copy code and replace dataset for different phases and different subsets. Datasets are 
+
+coxph_phase1_df: Phase 1, full population
+coxph_phase2and3_df: Phase 23, full population
+coxph_phase1_40cov: Phase 1, 40% subset
+coxph_phase2and3_40cov: Phase 2 and 3 40%subset
+
+2. Need to copy code and replace pollutant variable so there is one set for each of four pollutants. Variable names are:
+bc_avg2
+no2_avg5
+pm_avg1
+o3_avg1
+
+3. Need to repeat code for each outcome. Outcomes are:
+ards
+dialysis
+pneumo
+vent
+
+Remember the final object that stores the RR and CI for a given model should include the pollutant, outcome and phase/population so that later we can combine them all into a table.
+*** 
+
+
+#A Run Data Processing Script
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing.R")
+```
+
+## Function
+
+```{r}
+calculate_adj_model_int <- function(outcome, pollutant, phase_data) {
+  # Fit Poisson regression model
+  model.adj <- glm(formula(paste(outcome, "~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ asthma + diabetes + hyper")), 
+               data = phase_data, 
+               family = poisson(link = "log"))
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model.adj, vcov = sandwich)[, 1])
+  CI <- exp(confint(coeftest(model.adj, vcov = sandwich)))
+  
+  # Create a data frame with RR and CIs
+  result.1 <- as.data.frame(cbind(RR, CI))
+  result.1 <- cbind(as.data.frame(rownames(result.1)), result.1)
+  names(result.1)[2] <- "RR"
+  
+ Estimate = result.1[2, "RR"]
+  lwr = result.1[2, "2.5 %"]
+  upr = result.1[2, "97.5 %"]
+  result.2<-cbind(Estimate, lwr, upr)
+  
+  model.adj.int <- glm(formula(paste(outcome, "~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ asthma + diabetes + hyper", "+", pollutant, "*nevi")), 
+               data = phase_data, 
+               family = poisson(link = "log"))
+  
+test_interaction <- (as.data.frame(anova(model.adj,model.adj.int, test = "Chisq")))[2,5]
+
+
+model.adj.int2 = glm(formula(paste(outcome, "~", pollutant, "+ nevi_tertiles + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ asthma + diabetes + hyper", "+", pollutant, "*nevi_tertiles")), 
+               data = phase_data, 
+               family = poisson(link = "log"))
+
+Result_LowNevi<-glht(model.adj.int2, linfct=t(c(0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)), vcov=sandwich) #Confirmed that adding vcov=sandwich will ensure correct CIs when using confint
+#Confirmed that it doesn't matter where in model the interaction is placed, the coefficients will always be at the end after all of the main effects
+
+Result_LowNEVI_CI<-confint(Result_LowNevi)
+Result_LowNEVI_est<-exp(Result_LowNEVI_CI[[9]])
+
+Result_MedNevi<-glht(model.adj.int2, linfct=t(c(0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0)), vcov=sandwich) 
+
+Result_MedNEVI_CI<-confint(Result_MedNevi)
+Result_MedNEVI_est<-exp(Result_MedNEVI_CI[[9]])
+
+Result_HighNevi<-glht(model.adj.int2, linfct=t(c(0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1)), vcov=sandwich) 
+
+Result_HighNEVI_CI<-confint(Result_HighNevi)
+Result_HighNEVI_est<-exp(Result_HighNEVI_CI[[9]])
+
+result.3<-rbind(result.2, Result_LowNEVI_est, Result_MedNEVI_est, Result_HighNEVI_est)
+labels<-data.frame(c("Adj", "NEVI-T1", "NEVI-T2", "NEVI-T3"))
+colnames(labels)<-"label"
+result.3<-cbind(labels, result.3)
+result<-list(2)
+result[[1]]<-result.3
+result[[2]]<-test_interaction
+
+  return(result)
+}
+
+```
+
+
+### Test chunk
+output matches prior version 2/12
+```{r}
+output <- calculate_adj_model_int("ards", "no2_avg5", coxph_phase1_df)
+```
+
+
+## Running for all combinations 
+
+Note that results match original models run without functions
+```{r}
+result_df <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        stringsAsFactors = FALSE)
+
+phases_data = c("coxph_phase1_df", "coxph_phase2and3_df", "coxph_phase1_40cov", "coxph_phase2and3_40cov")
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1")
+outcomes = c("ards", "pneumo", "vent") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(phases_data[phase])
+      output <- calculate_adj_model_int(outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df <- rbind(result_df, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               output[[2]],
+                                               output[[1]]))
+    }
+  }
+}
+
+result_df
+```
+
+## Function for Survival Outcomes
+
+```{r}
+calculate_adjsurvival_model <- function(duration, outcome, pollutant, phase_data) {
+  # Fit Survival model
+  phase_data$Survial_outcome = Surv(phase_data[[duration]], phase_data[[outcome]])
+  
+    model.1 <- coxph(formula(paste("Surv(", duration, ", ", outcome, ") ~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+asthma + diabetes + hyper")), 
+               data = phase_data, 
+               ties = "breslow")
+    
+      # Store coefficients and CIs
+  HR <- exp(coeftest(model.1, vcov = sandwich)[, 1])
+  CI <- exp(confint(coeftest(model.1, vcov = sandwich)))
+  
+  # Create a data frame with RR and CIs
+  result.1 <- as.data.frame(cbind(HR, CI))
+  result.1 <- cbind(as.data.frame(rownames(result.1)), result.1)
+  names(result.1)[2] <- "HR"
+  
+ Estimate = result.1[1, "HR"]
+  lwr = result.1[1, "2.5 %"]
+  upr = result.1[1, "97.5 %"]
+  result.2<-cbind(Estimate, lwr, upr)
+  
+  model.2 <- coxph(formula(paste("Surv(", duration, ", ", outcome, ") ~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+asthma + diabetes + hyper+", pollutant, "*nevi")), 
+               data = phase_data, 
+               ties = "breslow")
+  
+test_interaction <- (as.data.frame(anova(model.1,model.2, test = "Chisq")))[2,4]
+
+  model.3 <- coxph(formula(paste("Surv(", duration, ", ", outcome, ") ~", pollutant, "+ nevi_tertiles + age + factor(sex) + factor(bmi_cat) + factor(smoke)+asthma + diabetes + hyper+", pollutant, "*nevi_tertiles")), 
+               data = phase_data, 
+               ties = "breslow")
+  
+Result_LowNevi <-glht(model.3, linfct=t(c(1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)), vcov=sandwich) #Confirmed that adding vcov=sandwich will ensure correct CIs when using confint
+#Confirmed that it doesn't matter where in model the interaction is placed, the coefficients will always be at the end after all of the main effects
+
+Result_LowNEVI_CI <-confint(Result_LowNevi )
+Result_LowNEVI_est <-exp(Result_LowNEVI_CI[[9]])
+
+Result_MedNevi <-glht(model.3, linfct=t(c(1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0)), vcov=sandwich) 
+
+Result_MedNEVI_CI <-confint(Result_MedNevi )
+Result_MedNEVI_est <-exp(Result_MedNEVI_CI[[9]])
+
+Result_HighNevi <-glht(model.3, linfct=t(c(1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1)), vcov=sandwich) 
+
+Result_HighNEVI_CI <-confint(Result_HighNevi )
+Result_HighNEVI_est <-exp(Result_HighNEVI_CI[[9]])
+
+result.3<-rbind(result.2, Result_LowNEVI_est, Result_MedNEVI_est, Result_HighNEVI_est)
+
+labels<-data.frame(c("Adj", "NEVI-T1", "NEVI-T2", "NEVI-T3"))
+colnames(labels)<-"label"
+result.3<-cbind(labels, result.3)
+result<-list(2)
+result[[1]]<-result.3
+result[[2]]<-test_interaction
+
+
+  return(result)
+}
+```
+
+### Test chunk
+
+Matches original output 2/12
+
+```{r}
+#output <- calculate_adjsurvival_model("hospital_days", "death", "no2_avg5", coxph_phase1_df)
+```
+
+## Running for all combinations 
+
+```{r}
+result_df_s <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+phases_data = c("coxph_phase1_df", "coxph_phase2and3_df", "coxph_phase1_40cov", "coxph_phase2and3_40cov")
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1") 
+duration = "hospital_days"
+outcomes = c("discharge", "death") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(phases_data[phase])
+      output <- calculate_adjsurvival_model(duration, outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_s <- rbind(result_df_s, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               output[[2]],
+                                               output[[1]]))
+    }
+  }
+}
+
+result_df_s
+```
+
+
+## Run Models for Dialysis (Requires different population, excluding those who had received dialysis previously)
+
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing2.R")
+
+result_df_d <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        stringsAsFactors = FALSE)
+
+phases_data = c("coxph_phase1_df", "coxph_phase2and3_df", "coxph_phase1_40cov", "coxph_phase2and3_40cov")
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1")
+outcomes = c("dialysis") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(phases_data[phase])
+      output <- calculate_adj_model_int(outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_d <- rbind(result_df_d, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               output[[2]],
+                                               output[[1]]))
+    }
+  }
+}
+
+result_df_d
+```
+
+
+
+## Export in excel workbook
+
+```{r}
+require(openxlsx)
+list_dataframes <- list("morbidity" = result_df, "dialysis" = result_df_d, "survival"=result_df_s)
+write.xlsx(list_dataframes, file = "Adjusted_results_int.xlsx")
+```
+

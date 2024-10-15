@@ -1,0 +1,97 @@
+---
+title: "Descriptives"
+author: "JAS"
+date: "2024-02-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# A Run Data Processing Script
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing_Descriptives.R")
+```
+#B Counts per ZIP Per Phase
+
+```{r}
+#Overall Counts by ZIP Code
+#For plotting, recode dialysis <0 and >1 as missing
+km_df$dialysis<-ifelse(km_df$dialysis<0, NA, ifelse(km_df$dialysis>1, NA, km_df$dialysis))
+
+outcome_counts_space<-km_df %>%
+  group_by(address_zip) %>%
+   summarise(
+    ards_count=sum(ards,na.rm=TRUE),
+    pneumo_count=sum(pneumo,na.rm=TRUE),
+    vent_count=sum(vent,na.rm=TRUE),
+    dialysis_count=sum(dialysis,na.rm=TRUE),
+    mortality_count=sum(death,na.rm=TRUE),
+    total_admission=n()
+    ) %>%
+  ungroup()
+
+#Stratify by Phase of the Pandemic
+outcome_counts_space_phase<-km_df %>%
+  group_by(address_zip, admit_date_phase) %>%
+   summarise(
+    ards_count=sum(ards,na.rm=TRUE),
+    pneumo_count=sum(pneumo,na.rm=TRUE),
+    vent_count=sum(vent,na.rm=TRUE),
+    dialysis_count=sum(dialysis,na.rm=TRUE),
+    mortality_count=sum(death,na.rm=TRUE),
+    total_admission=n()
+    ) %>%
+  ungroup()
+
+##Run mapping.RMD to get maps  
+
+```
+
+#C Time Series of Outcomes
+```{r}
+library(ggplot2)
+library(reshape2)
+
+#For plotting, recode dialysis <0 and >1 as missing
+
+km_df$dialysis<-ifelse(km_df$dialysis<0, NA, ifelse(km_df$dialysis>1, NA, km_df$dialysis))
+
+outcome_counts<-km_df %>%
+  group_by(admit_date) %>%
+  summarise(
+    ards_count=sum(ards,na.rm=TRUE),
+    pneumo_count=sum(pneumo,na.rm=TRUE),
+    vent_count=sum(vent,na.rm=TRUE),
+    dialysis_count=sum(dialysis,na.rm=TRUE),
+    mortality_count=sum(death,na.rm=TRUE),
+    total_admission=n()
+    ) %>%
+  ungroup()
+
+outcome_counts2<-km_df %>%
+  group_by(admit_date) %>%
+  summarise(
+    ards_count=sum(ards,na.rm=TRUE),
+    pneumo_count=sum(pneumo,na.rm=TRUE),
+    vent_count=sum(vent,na.rm=TRUE),
+    dialysis_count=sum(dialysis,na.rm=TRUE),
+    mortality_count=sum(death,na.rm=TRUE),
+    ) %>%
+  ungroup()
+
+merged_counts_melted<-melt(outcome_counts, id.vars="admit_date", variable.name="outcome", value.name="count")
+merged_counts_melted2<-melt(outcome_counts2, id.vars="admit_date", variable.name="outcome", value.name="count")
+
+
+sampleplot1<-ggplot(merged_counts_melted, aes(x=admit_date, y=count, color=outcome ))+
+  geom_line() +
+  labs(x="Date of Admission", y="Number of Outcomes", color="Outcome")+
+  ggtitle("Morbidity and Fatality Outcomes and Total Admissions \n within INSIGHT by Date of Admission")+scale_color_viridis_d(option="turbo")+
+  theme_minimal()
+
+ggsave("sampleplot1.png", plot=sampleplot1)
+
+```
+

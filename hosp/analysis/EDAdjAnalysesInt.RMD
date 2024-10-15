@@ -1,0 +1,169 @@
+---
+title: "ED Analysis"
+author: "JAS"
+date: "2024-04-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+Program for analysis of ED data to determine risk of being hospitalized
+
+#A Run Data Processing Script
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing ED.RMD")
+```
+
+```{r functions}
+
+calculate_crude_model <- function(outcome, pollutant, phase_data) {
+  # Fit Poisson regression model
+  model <- glm(formula(paste(outcome, "~", pollutant)), 
+               data = phase_data, 
+               family = poisson(link = "log"))
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model, vcov = sandwich)[, 1])
+  CI <- exp(confint(coeftest(model, vcov = sandwich)))
+  
+  # Create a data frame with RR and CIs
+  result <- as.data.frame(cbind(RR, CI))
+  result <- cbind(as.data.frame(rownames(result)), result)
+  names(result)[2] <- "RR"
+  
+  return(result)
+}
+
+calculate_adj_model_int <- function(outcome, pollutant, phase_data) {
+  # Fit Poisson regression model
+  model.adj <- glm(formula(paste(outcome, "~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ asthma + diabetes + hyper")), 
+               data = phase_data, 
+               family = poisson(link = "log"))
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model.adj, vcov = sandwich)[, 1])
+  CI <- exp(confint(coeftest(model.adj, vcov = sandwich)))
+  
+  # Create a data frame with RR and CIs
+  result.1 <- as.data.frame(cbind(RR, CI))
+  result.1 <- cbind(as.data.frame(rownames(result.1)), result.1)
+  names(result.1)[2] <- "RR"
+  
+ Estimate = result.1[2, "RR"]
+  lwr = result.1[2, "2.5 %"]
+  upr = result.1[2, "97.5 %"]
+  result.2<-cbind(Estimate, lwr, upr)
+  
+  model.adj.int <- glm(formula(paste(outcome, "~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ asthma + diabetes + hyper", "+", pollutant, "*nevi")), 
+               data = phase_data, 
+               family = poisson(link = "log"))
+  
+test_interaction <- (as.data.frame(anova(model.adj,model.adj.int, test = "Chisq")))[2,5]
+
+
+model.adj.int2 = glm(formula(paste(outcome, "~", pollutant, "+ nevi_tertiles + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ asthma + diabetes + hyper", "+", pollutant, "*nevi_tertiles")), 
+               data = phase_data, 
+               family = poisson(link = "log"))
+
+Result_LowNevi<-glht(model.adj.int2, linfct=t(c(0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)), vcov=sandwich) #Confirmed that adding vcov=sandwich will ensure correct CIs when using confint
+#Confirmed that it doesn't matter where in model the interaction is placed, the coefficients will always be at the end after all of the main effects
+
+Result_LowNEVI_CI<-confint(Result_LowNevi)
+Result_LowNEVI_est<-exp(Result_LowNEVI_CI[[9]])
+
+Result_MedNevi<-glht(model.adj.int2, linfct=t(c(0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0)), vcov=sandwich) 
+
+Result_MedNEVI_CI<-confint(Result_MedNevi)
+Result_MedNEVI_est<-exp(Result_MedNEVI_CI[[9]])
+
+Result_HighNevi<-glht(model.adj.int2, linfct=t(c(0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1)), vcov=sandwich) 
+
+Result_HighNEVI_CI<-confint(Result_HighNevi)
+Result_HighNEVI_est<-exp(Result_HighNEVI_CI[[9]])
+
+result.3<-rbind(result.2, Result_LowNEVI_est, Result_MedNEVI_est, Result_HighNEVI_est)
+labels<-data.frame(c("Adj", "NEVI-T1", "NEVI-T2", "NEVI-T3"))
+colnames(labels)<-"label"
+result.3<-cbind(labels, result.3)
+result<-list(2)
+result[[1]]<-result.3
+result[[2]]<-test_interaction
+
+  return(result)
+}
+
+```
+
+
+## Running for all combinations 
+
+Note that results match original models run without functions
+```{r}
+crude_result_df <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        stringsAsFactors = FALSE)
+
+phases_data = c("coxph_phase1_df", "coxph_phase2and3_df", "coxph_phase1_40cov", "coxph_phase2and3_40cov")
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1")
+outcomes = c("hosp") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(phases_data[phase])
+      output <- calculate_crude_model(outcomes[outcome], pollutants[pollutant], data)
+      
+      crude_result_df <- rbind(crude_result_df, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               output[[2]],
+                                               output[[3]],
+                                               output[[4]]))
+    }
+  }
+}
+
+crude_result_df
+
+result_df <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        stringsAsFactors = FALSE)
+
+phases_data = c("coxph_phase1_df", "coxph_phase2and3_df", "coxph_phase1_40cov", "coxph_phase2and3_40cov")
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1")
+outcomes = c("hosp") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(phases_data[phase])
+      output <- calculate_adj_model_int(outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df <- rbind(result_df, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               output[[2]],
+                                               output[[1]]))
+    }
+  }
+}
+
+result_df
+```
+
+## Export in excel workbook
+
+```{r}
+require(openxlsx)
+list_dataframes <- list("results" = result_df)
+write.xlsx(list_dataframes,  file = "Adjusted_EDresults_int.xlsx")
+
+list_dataframes <- list("results" = crude_result_df)
+write.xlsx(list_dataframes,  file = "Crude_EDresults.xlsx")
+```

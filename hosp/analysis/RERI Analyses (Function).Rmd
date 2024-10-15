@@ -1,0 +1,301 @@
+---
+title: "RERI Analyses (Function)"
+output: html_document
+date: "2023-07-28"
+---
+
+# A Run Data Processing Script
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing.R")
+```
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(readxl)
+library(msm)
+library(ggplot2)
+library(multcomp)
+library(sandwich)
+library(lmtest)
+```
+
+## Example Data 
+
+```{r}
+# set.seed(1230)
+# coxph_phase1_40cov <- data.frame(
+#   ards = sample(0:1, 1000, replace = TRUE),
+#   pneumo = sample(0:1, 1000, replace = TRUE),
+#   
+#   nevi = sample(c("low", "medium", "high"), 1000, replace = TRUE),
+#   sex = sample(c("female", "male", "other"), 1000, replace = TRUE),
+#   bmi_cat = sample(c("low", "normal", "high"), 1000, replace = TRUE), 
+#   smoke = sample(c("never", "sometimes", "often"), 1000, replace = TRUE), 
+#   age = sample(10:70, 1000, replace = TRUE),
+#   
+#   asthma = sample(0:1, 1000, replace = TRUE),
+#   diabetes = sample(0:1, 1000, replace = TRUE),
+#   hyper = sample(0:1, 1000, replace = TRUE),
+# 
+#   bc_avg2 = runif(1000),
+#   no2_avg5 = runif(1000)
+# ) 
+# 
+# coxph_phase1_40cov_lownevi <- coxph_phase1_40cov %>% 
+#   filter(nevi == "low") %>% view()
+# 
+# coxph_phase1_40cov_mediumnevi <- coxph_phase1_40cov %>% 
+#   filter(nevi == "medium")
+# 
+# coxph_phase1_40cov_highnevi <- coxph_phase1_40cov %>% 
+#   filter(nevi == "high")
+```
+
+# RERI ANALYSES
+
+```{r}
+data_list = c("coxph_phase1_40cov", "coxph_phase1_40cov_lownevi", "coxph_phase1_40cov_mediumnevi", "coxph_phase1_40cov_highnevi")
+NEVI = c("Overall", "\nAmong Those with Low Neighborhood Environmental Vulnerability", "\nAmong Those with Medium Neighborhood Environmental Vulnerability", "\nAmong Those with High Neighborhood Environmental Vulnerability")
+
+pollutants_list = c("no2_avg5", "bc_avg2", "pm_avg1", "o3_avg1") 
+pollutants_names = c("NO2 (5ppb)", "BC (2ug/m3)", "PM2.5 (1ug/m3)", "O3 (1ug/m3)") 
+
+outcomes_list = c("ards", "pneumo", "vent", "death", "discharge") 
+outcomes_names = c("ARDS", "Pneumonia", "Ventilation", "Fatality", "Length of Stay") 
+```
+
+##########################################################################################################################################################################################################################################################################################################
+## Diabetes
+
+```{r}
+diabetes_poisson_model <- function(outcome, outcome_name, pollutant, pollutant_name, data, NEVI) {
+  model <- glm(formula(paste(outcome, " ~ ", pollutant, " + nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke) + factor(asthma) + factor(hyper) + factor(diabetes) + ", pollutant, "*factor(diabetes)", sep = "")), 
+               data = get(data), 
+               family = poisson(link = "log"))
+  
+            pollutant_only<-glht(model, linfct=t(c(0,1,0,0,0,0,0,0,0,0,0,0,0,0,0)), vcov=sandwich)
+            test_pollutant_only<-confint(pollutant_only)
+            test_a<-test_pollutant_only[[9]]
+            test_a<-exp(test_a)
+            
+            comorbidity_only<-glht(model, linfct=t(c(0,0,0,0,0,0,0,0,0,0,0,0,0,1,0)), vcov=sandwich)
+            test_comorbidity_only<-confint(comorbidity_only)
+            test_b<-test_comorbidity_only[[9]]
+            test_b <- exp(test_b)
+            
+            pollutant_comorbidity<-glht(model, linfct=t(c(0,1,0,0,0,0,0,0,0,0,0,0,0,1,1)), vcov=sandwich)
+            test_pollutant_comorbidity<-confint(pollutant_comorbidity)
+            test_c<-test_pollutant_comorbidity[[9]]
+            test_c<-exp(test_c)
+            
+            v=as.matrix(sandwich(model))
+
+            v1=c(v[2,2], v[2,14], v[2,15])
+            v2a=c(v[14,2], v[14,14], v[14,15])
+            v3a=c(v[15,2], v[15,14], v[15,15])
+            v2=rbind(v1,v2a,v3a)
+            
+            coef <- model$coefficients
+            confint <- confint(model)
+            
+            require(msm)
+            RERI=exp(coef[[2]]+coef[[14]]+coef[[15]])-exp(coef[[2]])-exp(coef[[14]])+1
+            SE.RERI=deltamethod(~exp(x1+x2+x3)-exp(x1)-exp(x2)+1, mean=c(coef[[2]], coef[[14]], coef[[15]]), cov=v2)
+            alpha=0.05
+            z=qnorm(1-alpha/2)
+            
+            testint_ul=RERI+SE.RERI*z
+            testint_ll=RERI-SE.RERI*z
+            
+            model_data <- data.frame(x = factor(c("Ref Base Pollutant - No Diabetes", 
+                                                  "Pollutant only", 
+                                                  "Diabetes only", 
+                                                  "Pollutant and Diabetes", 
+                                                  "RERI"),
+                                                levels = c("Ref Base Pollutant - No Diabetes", 
+                                                           "Pollutant only", 
+                                                           "Diabetes only", 
+                                                           "Pollutant and Diabetes", 
+                                                           "RERI")),
+                                     y = c(1, test_a[1], test_b[1], test_c[1], RERI),
+                                     lower = c(NA, test_a[2], test_b[2], test_c[2], testint_ll),
+                                     higher = c(NA, test_a[3], test_b[3], test_c[3], testint_ul))
+            
+            ggplot(model_data, aes(x, y)) + 
+            geom_point() +
+            geom_errorbar(aes(ymin = lower, ymax = higher)) + 
+            xlab("Categories") + 
+            theme(plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.title.y = element_blank()) + 
+            ggtitle(paste(outcome_name, "RERI Analyses for Chronic", pollutant_name, "Exposure & Diabetes", NEVI))
+}
+```
+
+```{r}
+for (nevi in 1:length(data_list)) {
+  for (outcome in 1:length(outcomes_list)) {
+    for (pollutant in 1:length(pollutants_list)) {
+      
+      output <- diabetes_poisson_model(outcomes_list[outcome], outcomes_names[outcome], pollutants_list[pollutant], pollutants_names[pollutant], data_list[nevi], NEVI[nevi])
+      print(output)
+      
+    }
+  }
+}
+```
+
+##########################################################################################################################################################################################################################################################################################################
+## Asthma
+
+```{r}
+asthma_poisson_model <- function(outcome, outcome_name, pollutant, pollutant_name, data, NEVI) {
+  model <- glm(formula(paste(outcome, " ~ ", pollutant, " + nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke) + factor(asthma) + factor(hyper) + factor(diabetes) + ", pollutant, "*factor(asthma)", sep = "")), 
+               data = get(data), 
+               family = poisson(link = "log"))
+  
+            pollutant_only<-glht(model, linfct=t(c(0,1,0,0,0,0,0,0,0,0,0,0,0,0,0)), vcov=sandwich)
+            test_pollutant_only<-confint(pollutant_only)
+            test_a<-test_pollutant_only[[9]]
+            test_a<-exp(test_a)
+            
+            comorbidity_only<-glht(model, linfct=t(c(0,0,0,0,0,0,0,0,0,0,0,1,0,0,0)), vcov=sandwich)
+            test_comorbidity_only<-confint(comorbidity_only)
+            test_b<-test_comorbidity_only[[9]]
+            test_b <- exp(test_b)
+            
+            pollutant_comorbidity<-glht(model, linfct=t(c(0,1,0,0,0,0,0,0,0,0,0,1,0,0,1)), vcov=sandwich)
+            test_pollutant_comorbidity<-confint(pollutant_comorbidity)
+            test_c<-test_pollutant_comorbidity[[9]]
+            test_c<-exp(test_c)
+            
+            v=as.matrix(sandwich(model))
+
+            v1=c(v[2,2], v[2,14], v[2,15])
+            v2a=c(v[14,2], v[14,14], v[14,15])
+            v3a=c(v[15,2], v[15,14], v[15,15])
+            v2=rbind(v1,v2a,v3a)
+            
+            coef <- model$coefficients
+            confint <- confint(model)
+            
+            require(msm)
+            RERI=exp(coef[[2]]+coef[[14]]+coef[[15]])-exp(coef[[2]])-exp(coef[[14]])+1
+            SE.RERI=deltamethod(~exp(x1+x2+x3)-exp(x1)-exp(x2)+1, mean=c(coef[[2]], coef[[14]], coef[[15]]), cov=v2)
+            alpha=0.05
+            z=qnorm(1-alpha/2)
+            
+            testint_ul=RERI+SE.RERI*z
+            testint_ll=RERI-SE.RERI*z
+            
+            model_data <- data.frame(x = factor(c("Ref Base Pollutant - No Asthma", 
+                                                  "Pollutant only", 
+                                                  "Asthma only", 
+                                                  "Pollutant and Asthma", 
+                                                  "RERI"),
+                                                levels = c("Ref Base Pollutant - No Asthma", 
+                                                           "Pollutant only", 
+                                                           "Asthma only", 
+                                                           "Pollutant and Asthma", 
+                                                           "RERI")),
+                                     y = c(1, test_a[1], test_b[1], test_c[1], RERI),
+                                     lower = c(NA, test_a[2], test_b[2], test_c[2], testint_ll),
+                                     higher = c(NA, test_a[3], test_b[3], test_c[3], testint_ul))
+            
+            ggplot(model_data, aes(x, y)) + 
+            geom_point() +
+            geom_errorbar(aes(ymin = lower, ymax = higher)) + 
+            xlab("Categories") + 
+            theme(plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.title.y = element_blank()) + 
+            ggtitle(paste(outcome_name, "RERI Analyses for Chronic", pollutant_name, "Exposure & Asthma", NEVI))
+}
+```
+
+```{r}
+for (nevi in 1:length(data_list)) {
+  for (outcome in 1:length(outcomes_list)) {
+    for (pollutant in 1:length(pollutants_list)) {
+      
+      output <- asthma_poisson_model(outcomes_list[outcome], outcomes_names[outcome], pollutants_list[pollutant], pollutants_names[pollutant], data_list[nevi], NEVI[nevi])
+      print(output)
+    }
+  }
+}
+```
+
+##########################################################################################################################################################################################################################################################################################################
+## Hypertension
+
+```{r}
+hyper_poisson_model <- function(outcome, outcome_name, pollutant, pollutant_name, data, NEVI) {
+  model <- glm(formula(paste(outcome, " ~ ", pollutant, " + nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke) + factor(asthma) + factor(hyper) + factor(diabetes) + ", pollutant, "*factor(hyper)", sep = "")), 
+               data = get(data), 
+               family = poisson(link = "log"))
+  
+            pollutant_only<-glht(model, linfct=t(c(0,1,0,0,0,0,0,0,0,0,0,0,0,0,0)), vcov=sandwich)
+            test_pollutant_only<-confint(pollutant_only)
+            test_a<-test_pollutant_only[[9]]
+            test_a<-exp(test_a)
+            
+            comorbidity_only<-glht(model, linfct=t(c(0,0,0,0,0,0,0,0,0,0,0,0,1,0,0)), vcov=sandwich)
+            test_comorbidity_only<-confint(comorbidity_only)
+            test_b<-test_comorbidity_only[[9]]
+            test_b <- exp(test_b)
+            
+            pollutant_comorbidity<-glht(model, linfct=t(c(0,1,0,0,0,0,0,0,0,0,0,0,1,0,1)), vcov=sandwich)
+            test_pollutant_comorbidity<-confint(pollutant_comorbidity)
+            test_c<-test_pollutant_comorbidity[[9]]
+            test_c<-exp(test_c)
+            
+            v=as.matrix(sandwich(model))
+
+            v1=c(v[2,2], v[2,14], v[2,15])
+            v2a=c(v[14,2], v[14,14], v[14,15])
+            v3a=c(v[15,2], v[15,14], v[15,15])
+            v2=rbind(v1,v2a,v3a)
+            
+            coef <- model$coefficients
+            confint <- confint(model)
+            
+            require(msm)
+            RERI=exp(coef[[2]]+coef[[14]]+coef[[15]])-exp(coef[[2]])-exp(coef[[14]])+1
+            SE.RERI=deltamethod(~exp(x1+x2+x3)-exp(x1)-exp(x2)+1, mean=c(coef[[2]], coef[[14]], coef[[15]]), cov=v2)
+            alpha=0.05
+            z=qnorm(1-alpha/2)
+            
+            testint_ul=RERI+SE.RERI*z
+            testint_ll=RERI-SE.RERI*z
+            
+            model_data <- data.frame(x = factor(c("Ref Base Pollutant - No Hypertension", 
+                                                  "Pollutant only", 
+                                                  "Hypertension only", 
+                                                  "Pollutant and Hypertension", 
+                                                  "RERI"),
+                                                levels = c("Ref Base Pollutant - No Hypertension", 
+                                                           "Pollutant only", 
+                                                           "Hypertension only", 
+                                                           "Pollutant and Hypertension", 
+                                                           "RERI")),
+                                     y = c(1, test_a[1], test_b[1], test_c[1], RERI),
+                                     lower = c(NA, test_a[2], test_b[2], test_c[2], testint_ll),
+                                     higher = c(NA, test_a[3], test_b[3], test_c[3], testint_ul))
+            
+            ggplot(model_data, aes(x, y)) + 
+            geom_point() +
+            geom_errorbar(aes(ymin = lower, ymax = higher)) + 
+            xlab("Categories") + 
+            theme(plot.title = element_text(hjust = 0.5), axis.title.x = element_blank(), axis.title.y = element_blank()) + 
+            ggtitle(paste(outcome_name, "RERI Analyses for Chronic", pollutant_name, "Exposure & Hypertension", NEVI))
+}
+```
+
+```{r}
+for (nevi in 1:length(data_list)) {
+  for (outcome in 1:length(outcomes_list)) {
+    for (pollutant in 1:length(pollutants_list)) {
+      
+      output <- hyper_poisson_model(outcomes_list[outcome], outcomes_names[outcome], pollutants_list[pollutant], pollutants_names[pollutant], data_list[nevi], NEVI[nevi])
+      print(output)
+    }
+  }
+}
+```

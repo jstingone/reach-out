@@ -3,10 +3,12 @@ This repository contains code created and used as part of the Race, Ethnicity an
 
 Data sources include
 * Publicly-available data on COVID19 in NYC (public)
-* US Census Data (public)
-* CDC Places Project data (public)
+* Neighborhood Environmental Vulnerability Index (public and accessible at github.com/jstingone/nevi). Contains reference to:
+	* US Census Data (public)
+	* CDC Places Project data (public)
 * Hospitalization data from the INSIGHT Clinical Research Network (https://insightcrn.org/ for access procedures)
 * All-Cause Mortality data from NYC Department of Health and Mental Hygiene ( https://www.nyc.gov/site/doh/data/data-sets/data-requests-application-process-for-identifiable-vital-statistics-data.page for access procedures)
+
 
 Code is organized into folders based on outcomes under study
 * /mort: Analysis of Excess Mortality using All-Cause Mortality Records from NYC

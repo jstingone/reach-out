@@ -1,0 +1,156 @@
+---
+title: "Mapping"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(readxl)
+library(ggplot2)
+library(sf)
+library(viridis)
+library(gridExtra)
+
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE,
+	fig.width = 8,
+  fig.height = 6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+```
+
+# Loading shapefile for NYC zipcodes
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, include = F}
+zip_codes <- st_read("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/MODZCTA_2010.shp") %>% 
+  rename(zip_code = MODZCTA)
+```
+
+# Making Sure every zCTA is listed in outcomes data frame for each phase (filling-in zeroes)
+
+```{r}
+struct.data<-data.frame(
+                        zip_code=rep(zip_codes$zip_code, times=3),
+                        phase=factor(rep(rep(1:3, each=nrow(zip_codes)), times=1))
+)
+
+##This comes from descriptives.RMD. Make sure it is run first and still in ###global env.
+
+outcome_counts_space_phase$phase<-as.factor(outcome_counts_space_phase$admit_date_phase)
+
+outcome_counts_space_phase$zip_code<-(outcome_counts_space_phase$address_zip)
+
+outcome_counts_space_phase2 <- struct.data %>%
+left_join(outcome_counts_space_phase, by=c("zip_code", "phase") )
+
+```
+
+
+
+# Mapping admissions by zipcode (for phase 1) as an example
+
+```{r}
+mymap <- merge(zip_codes, outcome_counts_space_phase2) %>% 
+  filter(phase == 1)
+
+
+ggplot(data = mymap) +
+  geom_sf(aes(fill = total_admission), color = "black") +
+  scale_fill_viridis(name = "Total Admissions", option = "d") +
+  theme_void()
+```
+
+## Creates Individual Plots
+
+```{r}
+
+phases_list<-c(1, 2, 3)
+mymap <- merge(zip_codes, outcome_counts_space_phase2)
+
+plot_outcome_map <- function(data, phase, outcome_variable, label) {
+  ggplot(data = data) +
+    geom_sf(aes(fill = get(outcome_variable)), color = "black") +
+    scale_fill_viridis(name = paste(label, " (Phase ", phase, ")", sep = ""), option = "D") +
+    theme_void()
+}
+
+outcome_list <- c("total_admission", "mortality_count", "ards_count", "vent_count", "dialysis_count", "pneumo_count")
+label_list <- c("Total Admissions", "Deaths", "ARDS", "Mechanical Ventilation", "Dialysis", "Pneumonia")
+
+for (i in 1:length(phases_list)) {
+  mymap_phase <- mymap %>% 
+      filter(phase == phases_list[i])
+  for (outcome in 1:length(outcome_list)) {
+    plot <- plot_outcome_map(mymap_phase, phases_list[i], outcome_list[outcome], label_list[outcome])
+    print(plot)
+    }
+  }
+```
+
+## Creates Facet Plots
+
+```{r}
+plot_outcome_map2 <- function(data, outcome_variable, label) {
+  ggplot(data = data) +
+    geom_sf(aes(fill = get(outcome_variable)), color = "black") +
+    scale_fill_viridis(name = label, option = "D") +
+    theme_void()
+}
+
+long_outcome_data <- pivot_longer(outcome_counts_space_phase2, 
+                                  cols = -c(zip_code, phase, address_zip, admit_date_phase),
+                                  names_to = "Outcome",
+                                  values_to = "outcome_value") %>% 
+  mutate(Outcome = case_when(Outcome == "total_admission" ~ "Total Admissions",
+                             Outcome=="ards_count" ~ "ARDS",
+                             Outcome=="pneumo_count" ~ "Pneumonia",
+                             Outcome=="vent_count" ~ "Mechanical Ventilation",
+                             Outcome=="dialysis_count" ~ "Dialysis",
+                             Outcome=="mortality_count" ~ "Deaths",
+                             TRUE ~ Outcome))
+
+# check <- long_outcome_data %>% 
+#   filter(Outcome %in% c("Deaths", "Ventilation"))
+
+mymap3 <- merge(zip_codes, long_outcome_data, all = TRUE) %>% 
+  filter(Outcome == "Total Admissions")
+plot <- plot_outcome_map2(mymap3, "outcome_value", "Count")
+plot1 = plot + facet_wrap(~phase, ncol = 3)+theme(strip.text=element_blank(), strip.background = element_blank(), legend.key.size=unit(0.2,"cm"))
+
+mymap3 <- merge(zip_codes, long_outcome_data, all = TRUE) %>% 
+  filter(Outcome == "ARDS")
+plot <- plot_outcome_map2(mymap3, "outcome_value", "Count")
+plot2 = plot + facet_wrap(~phase, ncol = 3)+theme(strip.text=element_blank(), strip.background = element_blank(), legend.key.size=unit(0.2,"cm"))
+
+mymap3 <- merge(zip_codes, long_outcome_data, all = TRUE) %>% 
+  filter(Outcome == "Pneumonia")
+plot <- plot_outcome_map2(mymap3, "outcome_value", "Count")
+plot3 = plot + facet_wrap(~phase, ncol = 3)+theme(strip.text=element_blank(), strip.background = element_blank(), legend.key.size=unit(0.2,"cm"))
+
+mymap3 <- merge(zip_codes, long_outcome_data, all = TRUE) %>% 
+  filter(Outcome == "Dialysis")
+plot <- plot_outcome_map2(mymap3, "outcome_value", "Count")
+plot4 = plot + facet_wrap(~phase, ncol = 3)+theme(strip.text=element_blank(), strip.background = element_blank(), legend.key.size=unit(0.2,"cm"))
+
+mymap3 <- merge(zip_codes, long_outcome_data, all = TRUE) %>% 
+  filter(Outcome == "Mechanical Ventilation")
+plot <- plot_outcome_map2(mymap3, "outcome_value", "Count")
+plot5 = plot + facet_wrap(~phase, ncol = 3)+theme(strip.text=element_blank(), strip.background = element_blank(), legend.key.size=unit(0.2,"cm"))
+
+mymap3 <- merge(zip_codes, long_outcome_data, all = TRUE) %>% 
+  filter(Outcome == "Deaths")
+plot <- plot_outcome_map2(mymap3, "outcome_value", "Count")
+plot6 = plot + facet_wrap(~phase, ncol = 3)+theme(strip.text=element_blank(), strip.background = element_blank(), legend.key.size=unit(0.2,"cm"))
+
+plot7<-grid.arrange(plot2,plot3,plot4,plot5,plot6, ncol=1)
+
+ggsave("maps_supp.png", plot=plot7, width = 10, height=8, units="in")
+
+ggsave("maps_allcount.png", plot=plot1, width=10, height=8, units="in")
+```
+

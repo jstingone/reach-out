@@ -1,0 +1,599 @@
+---
+title: "Adjusted Analyses within Subpopulations"
+author: "JAS, building off code by Mehr"
+date: "4/19/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# install.packages("sandwich")
+# install.packages("lmtest")
+library(sandwich)
+library(lmtest)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Instructions for Creating Needed Code
+
+Subpopulation Analyses only run for Phase 1 40% Subset
+
+
+2. Need to  replace pollutant variable so there is one set for each of four pollutants. Variable names are:
+bc_avg2
+no2_avg5
+pm_avg1
+o3_avg1
+
+3. Need to repeat code for each outcome. Outcomes are:
+ards
+dialysis
+pneumo
+vent
+
+Remember the final object that stores the RR and CI for a given model should include the pollutant, outcome and population so that later we can combine them all into a table.
+
+
+Adding stratified models for comorbidities
+*** 
+
+
+#A Run Data Processing Script
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing.R")
+```
+
+## Function 1
+
+For subpopulations not defined by comorbidities (age, race, ethnicity)
+
+```{r}
+calculate_adj_model_strat <- function(outcome, pollutant, phase_data) {
+  # Fit Poisson regression model
+  model <- glm(formula(paste(outcome, "~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ asthma + diabetes + hyper")), 
+               data = phase_data, 
+               family = poisson(link = "log"))
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model, vcov = sandwich)[, 1])
+  CI <- exp(confint(coeftest(model, vcov = sandwich)))
+  
+  # Create a data frame with RR and CIs
+  result <- as.data.frame(cbind(RR, CI))
+  result <- cbind(as.data.frame(rownames(result)), result)
+  names(result)[2] <- "RR"
+  
+  return(result)
+}
+```
+
+##Function 2
+
+For subpopulations defined by comorbidities (asthma, diabetes, hypertension)
+```{r}
+calculate_adj_model_strat_asthma <- function(outcome, pollutant, phase_data) {
+  # Fit Poisson regression model
+  model <- glm(formula(paste(outcome, "~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ diabetes + hyper")), 
+               data = phase_data, 
+               family = poisson(link = "log"))
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model, vcov = sandwich)[, 1])
+  CI <- exp(confint(coeftest(model, vcov = sandwich)))
+  
+  # Create a data frame with RR and CIs
+  result <- as.data.frame(cbind(RR, CI))
+  result <- cbind(as.data.frame(rownames(result)), result)
+  names(result)[2] <- "RR"
+  
+  return(result)
+}
+
+  calculate_adj_model_strat_diab<- function(outcome, pollutant, phase_data) {
+  # Fit Poisson regression model
+  model <- glm(formula(paste(outcome, "~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke) + hyper+asthma")), 
+               data = phase_data, 
+               family = poisson(link = "log"))
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model, vcov = sandwich)[, 1])
+  CI <- exp(confint(coeftest(model, vcov = sandwich)))
+  
+  # Create a data frame with RR and CIs
+  result <- as.data.frame(cbind(RR, CI))
+  result <- cbind(as.data.frame(rownames(result)), result)
+  names(result)[2] <- "RR"
+  
+  return(result)
+  }
+  
+  calculate_adj_model_strat_hyper<- function(outcome, pollutant, phase_data) {
+  # Fit Poisson regression model
+  model <- glm(formula(paste(outcome, "~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ diabetes + asthma")), 
+               data = phase_data, 
+               family = poisson(link = "log"))
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model, vcov = sandwich)[, 1])
+  CI <- exp(confint(coeftest(model, vcov = sandwich)))
+  
+  # Create a data frame with RR and CIs
+  result <- as.data.frame(cbind(RR, CI))
+  result <- cbind(as.data.frame(rownames(result)), result)
+  names(result)[2] <- "RR"
+  
+  return(result)
+}
+```
+
+## Running for all combinations 
+
+Note that results match original models run without functions-JAS
+```{r}
+
+all_objects<-ls()
+
+subpop.df.all<-all_objects[grep("_40cov_", all_objects)]
+subpop.df.demo<-subpop.df.all[!grepl("asthma|diabetes|hyper|nevi|headings", subpop.df.all)]
+
+subpop.df.demo<-subpop.df.demo[sapply(subpop.df.demo, function(x) is.data.frame(get(x)))]
+
+
+result_df <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1")
+outcomes = c("ards", "pneumo", "vent") 
+
+for (phase in 1:length(subpop.df.demo)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(subpop.df.demo[phase])
+      output <- calculate_adj_model_strat(outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df <- rbind(result_df, data.frame(PhaseData = subpop.df.demo[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[2, "RR"],
+                                               lower_95CI = output[2, "2.5 %"],
+                                               upper_95CI = output[2, "97.5 %"]))
+    }
+  }
+}
+
+result_df
+
+subpop.df<-all_objects[grep("_40cov_", all_objects)]
+subpop.df.asthma<-subpop.df[grepl("asthma", subpop.df)]
+subpop.df.hyper<-subpop.df[grepl("hyper", subpop.df)]
+subpop.df.diab<-subpop.df[grepl("diab", subpop.df)]
+
+result_df_asthma <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1")
+outcomes = c("ards", "pneumo", "vent") 
+
+for (phase in 1:length(subpop.df.asthma)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(subpop.df.asthma[phase])
+      output <- calculate_adj_model_strat_asthma(outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_asthma <- rbind(result_df_asthma, data.frame(PhaseData = subpop.df.asthma[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[2, "RR"],
+                                               lower_95CI = output[2, "2.5 %"],
+                                               upper_95CI = output[2, "97.5 %"]))
+    }
+  }
+}
+
+result_df_asthma
+
+result_df_hyper <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1")
+outcomes = c("ards", "pneumo", "vent") 
+
+for (phase in 1:length(subpop.df.hyper)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(subpop.df.hyper[phase])
+      output <- calculate_adj_model_strat_hyper(outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_hyper <- rbind(result_df_hyper, data.frame(PhaseData = subpop.df.hyper[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[2, "RR"],
+                                               lower_95CI = output[2, "2.5 %"],
+                                               upper_95CI = output[2, "97.5 %"]))
+    }
+  }
+}
+
+result_df_hyper
+
+result_df_diab <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1")
+outcomes = c("ards", "pneumo", "vent") 
+
+for (phase in 1:length(subpop.df.diab)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(subpop.df.diab[phase])
+      output <- calculate_adj_model_strat_diab(outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_diab <- rbind(result_df_diab, data.frame(PhaseData = subpop.df.diab[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[2, "RR"],
+                                               lower_95CI = output[2, "2.5 %"],
+                                               upper_95CI = output[2, "97.5 %"]))
+    }
+  }
+}
+
+result_df_diab
+
+```
+
+## Function for Survival Outcomes
+
+```{r}
+calculate_adjsurvival_strat <- function(duration, outcome, pollutant, phase_data) {
+  # Fit Survival model
+  phase_data$Survial_outcome = Surv(phase_data[[duration]], phase_data[[outcome]])
+  model <- coxph(formula(paste("Surv(", duration, ", ", outcome, ") ~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ asthma + diabetes + hyper")), 
+               data = phase_data, 
+               ties = "breslow")
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model))
+  CI <- exp(confint(model))
+  
+  # Create a data frame with RR and CIs
+  result <- as.data.frame(cbind(RR, CI))
+  result <- cbind(as.data.frame(rownames(result)), result)
+  names(result)[2] <- "RR"
+  
+  return(result)
+}
+
+calculate_adjsurvival_strat_asthma <- function(duration, outcome, pollutant, phase_data) {
+  # Fit Survival model
+  phase_data$Survial_outcome = Surv(phase_data[[duration]], phase_data[[outcome]])
+  model <- coxph(formula(paste("Surv(", duration, ", ", outcome, ") ~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ diabetes + hyper")), 
+               data = phase_data, 
+               ties = "breslow")
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model))
+  CI <- exp(confint(model))
+  
+  # Create a data frame with RR and CIs
+  result <- as.data.frame(cbind(RR, CI))
+  result <- cbind(as.data.frame(rownames(result)), result)
+  names(result)[2] <- "RR"
+  
+  return(result)
+}
+
+calculate_adjsurvival_strat_diab <- function(duration, outcome, pollutant, phase_data) {
+  # Fit Survival model
+  phase_data$Survial_outcome = Surv(phase_data[[duration]], phase_data[[outcome]])
+  model <- coxph(formula(paste("Surv(", duration, ", ", outcome, ") ~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ asthma + hyper")), 
+               data = phase_data, 
+               ties = "breslow")
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model))
+  CI <- exp(confint(model))
+  
+  # Create a data frame with RR and CIs
+  result <- as.data.frame(cbind(RR, CI))
+  result <- cbind(as.data.frame(rownames(result)), result)
+  names(result)[2] <- "RR"
+  
+  return(result)
+}
+
+calculate_adjsurvival_strat_hyper <- function(duration, outcome, pollutant, phase_data) {
+  # Fit Survival model
+  phase_data$Survial_outcome = Surv(phase_data[[duration]], phase_data[[outcome]])
+  model <- coxph(formula(paste("Surv(", duration, ", ", outcome, ") ~", pollutant, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ asthma + diabetes")), 
+               data = phase_data, 
+               ties = "breslow")
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model))
+  CI <- exp(confint(model))
+  
+  # Create a data frame with RR and CIs
+  result <- as.data.frame(cbind(RR, CI))
+  result <- cbind(as.data.frame(rownames(result)), result)
+  names(result)[2] <- "RR"
+  
+  return(result)
+}
+
+```
+
+
+## Running for all combinations 
+
+```{r}
+result_df_s <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+phases_data = subpop.df.demo
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1") 
+duration = "hospital_days"
+outcomes = c("discharge", "death") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(phases_data[phase])
+      output <- calculate_adjsurvival_strat(duration, outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_s <- rbind(result_df_s, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[1,2],
+                                               lower_95CI = output[1,6],
+                                               upper_95CI = output[1,7]))
+    }
+  }
+}
+
+result_df_s
+
+result_df_asthma_s <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+phases_data = subpop.df.asthma
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1") 
+duration = "hospital_days"
+outcomes = c("discharge", "death") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(phases_data[phase])
+      output <- calculate_adjsurvival_strat_asthma(duration, outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_asthma_s <- rbind(result_df_asthma_s, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[1,2],
+                                               lower_95CI = output[1,6],
+                                               upper_95CI = output[1,7]))
+    }
+  }
+}
+
+result_df_asthma_s
+
+result_df_hyper_s <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+phases_data = subpop.df.hyper
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1") 
+duration = "hospital_days"
+outcomes = c("discharge", "death") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(phases_data[phase])
+      output <- calculate_adjsurvival_strat_hyper(duration, outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_hyper_s <- rbind(result_df_hyper_s, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[1,2],
+                                               lower_95CI = output[1,6],
+                                               upper_95CI = output[1,7]))
+    }
+  }
+}
+
+result_df_hyper_s
+
+result_df_diab_s <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+phases_data = subpop.df.diab
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1") 
+duration = "hospital_days"
+outcomes = c("discharge", "death") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(phases_data[phase])
+      output <- calculate_adjsurvival_strat_diab(duration, outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_diab_s <- rbind(result_df_diab_s, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[1,2],
+                                               lower_95CI = output[1,6],
+                                               upper_95CI = output[1,7]))
+    }
+  }
+}
+
+result_df_diab_s
+```
+
+## Run Models for Dialysis (Requires different population, excluding those who had received dialysis previously)
+
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing2.R")
+
+result_df_d <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1")
+outcomes = c("dialysis") 
+
+for (phase in 1:length(subpop.df.demo)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(subpop.df.demo[phase])
+      output <- calculate_adj_model_strat(outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_d <- rbind(result_df_d, data.frame(PhaseData = subpop.df.demo[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[2, "RR"],
+                                               lower_95CI = output[2, "2.5 %"],
+                                               upper_95CI = output[2, "97.5 %"]))
+    }
+  }
+}
+
+result_df_d
+
+
+result_df_asthma_d <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+for (phase in 1:length(subpop.df.asthma)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(subpop.df.asthma[phase])
+      output <- calculate_adj_model_strat_asthma(outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_asthma_d <- rbind(result_df_asthma_d, data.frame(PhaseData = subpop.df.asthma[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[2, "RR"],
+                                               lower_95CI = output[2, "2.5 %"],
+                                               upper_95CI = output[2, "97.5 %"]))
+    }
+  }
+}
+
+result_df_asthma_d
+
+result_df_hyper_d <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+for (phase in 1:length(subpop.df.hyper)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(subpop.df.hyper[phase])
+      output <- calculate_adj_model_strat_hyper(outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_hyper_d <- rbind(result_df_hyper_d, data.frame(PhaseData = subpop.df.hyper[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[2, "RR"],
+                                               lower_95CI = output[2, "2.5 %"],
+                                               upper_95CI = output[2, "97.5 %"]))
+    }
+  }
+}
+
+result_df_hyper_d
+
+result_df_diab_d <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+
+for (phase in 1:length(subpop.df.diab)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(subpop.df.diab[phase])
+      output <- calculate_adj_model_strat_diab(outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_diab_d <- rbind(result_df_diab_d, data.frame(PhaseData = subpop.df.diab[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[2, "RR"],
+                                               lower_95CI = output[2, "2.5 %"],
+                                               upper_95CI = output[2, "97.5 %"]))
+    }
+  }
+}
+
+result_df_diab_d
+
+```
+
+
+
+## Export in excel workbook
+
+```{r}
+require(openxlsx)
+list_dataframes <- list("strat_demo" = result_df, "strat_asthma" = result_df_asthma, "strat_hyper"=result_df_hyper, "strat_diab"=result_df_diab, "strat_demo_s" = result_df_s, "strat_asthma_s" = result_df_asthma_s, "strat_hyper_s"=result_df_hyper_s, "strat_diab_s"=result_df_diab_s,"strat_demo_d" = result_df_d, "strat_asthma_d" = result_df_asthma_d, "strat_hyper_d"=result_df_hyper_d, "strat_diab_d"=result_df_diab_d)
+write.xlsx(list_dataframes, file = "Stratified_results.xlsx")
+```
+

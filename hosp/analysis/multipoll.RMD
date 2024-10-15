@@ -1,0 +1,195 @@
+---
+title: "MultipollutantModels"
+author: "JAS"
+date: "2024-01-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# A Run Data Processing Script
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing.R")
+```
+
+
+```{r models}
+calculate_adj_model_multipoll <- function(outcome, pollutant1, pollutant2, phase_data) {
+  # Fit Poisson regression model
+  model.adj <- glm(formula(paste(outcome, "~", pollutant1, "+", pollutant2, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+ asthma + diabetes + hyper")), 
+               data = phase_data, 
+               family = poisson(link = "log"))
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model.adj, vcov = sandwich)[, 1])
+  CI <- exp(confint(coeftest(model.adj, vcov = sandwich)))
+  
+  # Create a data frame with RR and CIs
+  result.1 <- as.data.frame(cbind(RR, CI))
+  result.1 <- cbind(as.data.frame(rownames(result.1)), result.1)
+  names(result.1)[2] <- "RR"
+  
+ Estimate = result.1[2, "RR"]
+  lwr = result.1[2, "2.5 %"]
+  upr = result.1[2, "97.5 %"]
+  
+   Estimate2 = result.1[3, "RR"]
+  lwr2 = result.1[3, "2.5 %"]
+  upr2 = result.1[3, "97.5 %"]
+  
+  result.2<-cbind(Estimate, lwr, upr, Estimate2, lwr2, upr2)
+  
+  return(result.2)
+}
+
+#output<-calculate_adj_model_multipoll("ards", "pm_avg1", "o3_avg1", coxph_phase1_40cov)
+
+```
+
+Run for combinations
+
+```{r}
+result_df <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        stringsAsFactors = FALSE)
+
+phases_data = c("coxph_phase1_df", "coxph_phase2and3_df", "coxph_phase1_40cov", "coxph_phase2and3_40cov")
+pollutants1 = c("bc_avg2", "no2_avg5", "pm_avg1")
+pollutant2=c("o3_avg1")
+outcomes = c("ards", "pneumo", "vent") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants1)) {
+      data = get(phases_data[phase])
+      output <- calculate_adj_model_multipoll(outcomes[outcome], pollutants1[pollutant], pollutant2, data)
+      
+      result_df <- rbind(result_df, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant1 = pollutants1[pollutant],
+                                               Pollutant2=pollutant2,
+                                               output
+                                               ))
+    }
+  }
+}
+
+result_df
+```
+
+
+## Function for Survival Outcomes
+
+```{r}
+calculate_adjsurvival_model_multipoll <- function(duration, outcome, pollutant1, pollutant2, phase_data) {
+  # Fit Survival model
+  phase_data$Survial_outcome = Surv(phase_data[[duration]], phase_data[[outcome]])
+  
+    model.1 <- coxph(formula(paste("Surv(", duration, ", ", outcome, ") ~", pollutant1, "+", pollutant2, "+ nevi + age + factor(sex) + factor(bmi_cat) + factor(smoke)+asthma + diabetes + hyper")), 
+               data = phase_data, 
+               ties = "breslow")
+    
+      # Store coefficients and CIs
+  HR <- exp(coeftest(model.1, vcov = sandwich)[, 1])
+  CI <- exp(confint(coeftest(model.1, vcov = sandwich)))
+  
+  # Create a data frame with RR and CIs
+  result.1 <- as.data.frame(cbind(HR, CI))
+  result.1 <- cbind(as.data.frame(rownames(result.1)), result.1)
+  names(result.1)[2] <- "HR"
+  
+ Estimate = result.1[1, "HR"]
+  lwr = result.1[1, "2.5 %"]
+  upr = result.1[1, "97.5 %"]
+ 
+   Estimate2 = result.1[2, "HR"]
+  lwr2 = result.1[2, "2.5 %"]
+  upr2 = result.1[2, "97.5 %"] 
+  
+  result.2<-cbind(Estimate, lwr, upr, Estimate2, lwr2, upr2)
+   return(result.2)
+}
+
+output<-calculate_adjsurvival_model_multipoll("hospital_days", "death", "no2_avg5", "o3_avg1", coxph_phase1_40cov)
+ 
+```
+
+##Running all combinations
+
+```{r}
+result_df_s <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+phases_data = c("coxph_phase1_df", "coxph_phase2and3_df", "coxph_phase1_40cov", "coxph_phase2and3_40cov")
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1")
+pollutant2=c("o3_avg1")
+duration = "hospital_days"
+outcomes = c("discharge", "death") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(phases_data[phase])
+      output <- calculate_adjsurvival_model_multipoll(duration, outcomes[outcome], pollutants[pollutant], pollutant2, data)
+      
+      result_df_s <- rbind(result_df_s, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               Pollutant2=pollutant2,
+                                               output))
+    }
+  }
+}
+
+result_df_s
+```
+
+Run for diabetes
+
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing2.R")
+
+result_df_d <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        stringsAsFactors = FALSE)
+
+phases_data = c("coxph_phase1_df", "coxph_phase2and3_df", "coxph_phase1_40cov", "coxph_phase2and3_40cov")
+pollutants1 = c("bc_avg2", "no2_avg5", "pm_avg1")
+pollutant2=c("o3_avg1")
+outcomes = c("dialysis") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants1)) {
+      data = get(phases_data[phase])
+      output <- calculate_adj_model_multipoll(outcomes[outcome], pollutants1[pollutant], pollutant2, data)
+      
+      result_df_d <- rbind(result_df_d, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant1 = pollutants1[pollutant],
+                                               Pollutant2=pollutant2,
+                                               output
+                                               ))
+    }
+  }
+}
+
+result_df_d
+```
+
+## Export in excel workbook
+
+```{r}
+require(openxlsx)
+list_dataframes <- list("morbidity" = result_df, "dialysis" = result_df_d, "survival"=result_df_s)
+write.xlsx(list_dataframes, file = "Adjusted_results_multipoll.xlsx")
+```
