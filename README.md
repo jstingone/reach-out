@@ -1,18 +1,21 @@
 # REACH-OUT
-This repository contains code created and used as part of the Race, Ethnicity and Air pollution in COVID19 Hospitalization Outcomes (REACH-OUT) Project.
+This repository contains code created and used as part of the Race, Ethnicity and Air pollution in COVID19 Hospitalization Outcomes (REACH-OUT) Project. REACH-OUT aimed to estimate the effect of chronic air pollution exposure on risk of COVID-19 morbidity and mortality and determine if these effects vary by neighborhood-level vulnerability, defined by multiple social and structural factors, to explain the COVID-19 disparities observed in New York City (NYC). 
 
-Data sources include
-* Publicly-available data on COVID19 in NYC (public)
-* Neighborhood Environmental Vulnerability Index (public and accessible [here] (https://github.com/jstingone/nevi)). Contains reference to:
+
+Data sources used within the project include:
+* Publicly-available data on COVID19 in NYC (public and accessible repo at : https://github.com/nychealth/coronavirus-data)
+* Neighborhood Environmental Vulnerability Index (public and accessible repo at https://github.com/jstingone/nevi). Contains reference to:
 	* US Census Data (public)
-	* CDC Places Project data (public)
+	* CDC Places Project data (public and accessible at https://cdc.gov/places/index.html)
 * Hospitalization data from the INSIGHT Clinical Research Network (https://insightcrn.org/ for access procedures)
 * All-Cause Mortality data from NYC Department of Health and Mental Hygiene ( https://www.nyc.gov/site/doh/data/data-sets/data-requests-application-process-for-identifiable-vital-statistics-data.page for access procedures)
 
 
 Code is organized into folders based on outcomes under study
-* /mort: Analysis of Excess Mortality using All-Cause Mortality Records from NYC
 * /hosp: Analysis of hospitalization outcomes using harmonized EHR data within the INSIGHT CRN
+* /validation: Demographic Comparison of Institution-Specific Data to INSIGHT CRN
+* /mort: Analysis of Excess Mortality using All-Cause Mortality Records from NYC
+
 
 Links to publications will be added as they become available.
 
@@ -23,7 +26,7 @@ Co-Investigators:\
 Sandra S Albrecht PHD MPH\
                   Alexander Azan MD\
                   Earle C Chambers PhD MPH\
-                  Sneha Kannoth MPH\
+                  Sneha Kannoth PhD MPH\
                   Min Qian PhD\
                   Mehr Shafiq MPH\
                   Perry E Sheffield MD MPH\
