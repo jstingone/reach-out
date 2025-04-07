@@ -3054,6 +3054,22 @@ if first.patid then do;
 	systolic_first_r=systolic_first;
 
 end;
+admit_date_r=admit_date;
+	admit_date_phase_r=admit_date_phase;
+	discharge_date_r=discharge_date;
+	hospital_days_r=hospital_days;
+	ards_r=ards;
+	pneumo_r=pneumo;
+	vent_r=vent;
+	dialysis_r=dialysis;
+	asthma_r=asthma;
+	diabetes_r=diabetes;
+	hyper_r=hyper;
+	smoke_r=smoke;
+	age_r=age;
+	bmi_num_r=bmi_num;
+	diastolic_first_r=diastolic_first;
+	systolic_first_r=systolic_first;
 end;
 run;
 
@@ -3070,6 +3086,37 @@ DATA insight_covid_encounters_nevi;
 	BY patid admit_date discharge_date;
 	IF last.admit_date;
 run;
+
+
+
+data time_diff;
+set insight_covid_encounters_nevi;
+by patid;
+retain prev_end_date;
+
+time_diff=.;
+
+if first.patid then do;
+prev_end_date=.;
+end;
+
+if not first.patid then do;
+time_diff=admit_date-prev_end_date;
+end;
+
+prev_end_date=discharge_date;
+run;
+
+proc means data=time_diff min max;
+var time_diff;
+run;
+
+data flag;
+set time_diff;
+where .z<time_diff <0;
+run;
+
+
 
 
 /*16.4 Manually check 10 PATIDs with adjacent encounters to ensure correct variable construction; Checks out*/
@@ -3129,8 +3176,16 @@ run;
 
 /*16.5 Merge encounters with over-lapping but not exactly adjacent admission/discharge dates*/
 	/*For repeat Patient IDs, calculate time in days between discharge and admission of next encounter to examine types of overlap*/
-data encounter_overlap_test;
+	/*Note this is checking each encounter to the previous. Works in majority of cases because only 2. But can miss some if 3 or more. Have code below*/
+    /*to catch those instances.*/
+
+data insight_covid_encounters_nevi_2;
 set insight_covid_encounters_nevi;
+drop admit_date_r discharge_date_r;
+run;
+
+data encounter_overlap_test;
+set insight_covid_encounters_nevi_2;
 by patid;
 Retain admit_date_r discharge_date_r ;
 if first.patid then do;
@@ -3143,15 +3198,15 @@ if first.patid then do;
 	discharge_date_r=discharge_date;
 	end;
 
-if .z<timebw1<0 and .z<timebw2<=0 then overlap=1; /*Subsequent encounter fully within prior*/
-else if .z<timebw1<0 and timebw2>0 then overlap=2; /*Partial overlap*/
-else if timebw1>0 and .z<timebw2<0 then overlap=3; /*Partial overlap*/
-else if timebw1>0 and timebw2=>0 then overlap=0; /*Subsequent encounter fully after prior*/
+if .z<timebw1<=0 and .z<timebw2<=0 then overlap=1; /*Subsequent encounter fully within prior*/
+else if .z<timebw1<=0 and timebw2=>0 then overlap=2; /*Partial overlap*/
+else if timebw1=>0 and .z<timebw2<=0 then overlap=3; /*Partial overlap*/
+else if timebw1>0 and timebw2>0 then overlap=0; /*Subsequent encounter fully after prior*/
 else overlap=99; 
 run;
 
 proc freq data=encounter_overlap_test;
-table overlap;
+table overlap/missing;
 run;
 
 /*All subsequent encounters are either fully within or fully after (yay!). Now need to merge the fully within. No need to change admit days or any variables created just using patid or .*/
@@ -3206,7 +3261,7 @@ quit;
 
 proc sql;
 select count(distinct patid) as distinct_patid
-from DataCong.insight_covid_encounters;
+from DataCong.insight_covid_encounters_nevi;
 quit;
 /*Totals match*/
 
@@ -3227,8 +3282,863 @@ proc means data=test_phase nmiss;
 var check_zero;
 run;
 
-data DataCong.insight_covid_encounters_nevi; /*Save final analytic dataset and drop unneeded variables*/
+/*Code to catch those where there are more than 2 encounters per patid and require additional cleaning to ensure no duplicates*/
+proc sort data=new3;
+by patid admit_date;
+run;
+
+data test_a;
 set new3;
+by patid;
+
+retain lag_discharge_date;
+
+if first.patid then do;
+diff=.;
+lag_discharge_date=.;
+end;
+
+else diff=admit_date-lag_discharge_date;
+lag_discharge_date=discharge_date;
+run;
+
+proc univariate data=test_a;
+var diff;
+run;
+
+proc sort data=test_a;
+by patid admit_date;
+run;
+
+data test_2a;
+set test_a;
+by patid;
+
+retain has_negative_diff;
+
+if first.patid then do;
+has_negative_diff=0;
+if .<diff<=0 then has_negative_diff=1;
+end;
+else if .<diff<=0 then has_negative_diff=1;
+if last.patid and has_negative_diff=1 then output;
+run;
+
+data test_3a;
+merge test_2a (in=a) test_a (in=b);
+by patid;
+if a;
+run;
+
+/*Checking that remaining have no negative differences*/
+data test_4a;
+merge test_2a (in=a) test_a (in=b);
+by patid;
+if ~ a;
+run;
+
+proc means data=test_4a;
+var diff;
+run;
+
+/*Combine adjacent and then merge those that are fully within*/
+proc sort data=test_3a;
+by patid admit_date;
+run;
+
+data test_3a;
+set test_3a;
+drop overlap lag_discharge_date diff has_negative_diff timebw1 timebw2 admit_date_r discharge_date_r admit_date_phase_r hospital_days_r ards_r pneumo_r vent_r dialysis_r asthma_r diabetes_r hyper_r smoke_r age_r bmi_num_r diastolic_first_r systolic_first_r;
+run;
+
+Data insight_covid_combine_a;
+SET test_3a;
+By patid;
+
+Retain admit_date_r discharge_date_r admit_date_phase_r hospital_days_r ards_r pneumo_r vent_r dialysis_r asthma_r diabetes_r hyper_r smoke_r age_r bmi_num_r diastolic_first_r systolic_first_r;
+
+if first.patid then do;
+	admit_date_r=admit_date;
+	admit_date_phase_r=admit_date_phase;
+	discharge_date_r=discharge_date;
+	hospital_days_r=hospital_days;
+	ards_r=ards;
+	pneumo_r=pneumo;
+	vent_r=vent;
+	dialysis_r=dialysis;
+	asthma_r=asthma;
+	diabetes_r=diabetes;
+	hyper_r=hyper;
+	smoke_r=smoke;
+	age_r=age;
+	bmi_num_r=bmi_num;
+	diastolic_first_r=diastolic_first;
+	systolic_first_r=systolic_first;
+	end;
+ else do;
+	if admit_date = discharge_date_r then do;  
+	admit_date=admit_date_r;
+	admit_date_phase=admit_date_phase_r;
+	hospital_days=hospital_days+hospital_days_r; /*Calculate hospital days as sum of encounters*/
+	if ards ne 1 and ards_r=1 then ards=1;		/*If earlier encounter had outcome recorded and it isn't in the later encounter, we recode here*/
+	if pneumo ne 1 and pneumo_r=1 then pneumo=1;
+	if vent ne 1 and vent_r=1 then vent=1;
+	if dialysis in (0,1,2) then dialysis=dialysis; /*If later encounter has 0 or 1 for dialysis, earlier dialysis must be 0 so stays the same. If later encounter has 2, stays same.*/
+		else if dialysis=-1 and dialysis_r = 1 then dialysis=1;       /*If later encounter has -1, could have been from earlier covid encounter. So need to check that dialysis_r ne 1. If is, recode*/
+
+	asthma=asthma_r;													/*Use chronic disease from earlier encounter*/
+	diabetes=diabetes_r;
+	hyper=hyper_r;
+	smoke=smoke_r;
+	age=age_r;
+	bmi_num=bmi_num_r;
+	diastolic_first=diastolic_first_r;
+	systolic_first=systolic_first_r;
+
+	admit_date_r=admit_date;
+	admit_date_phase_r=admit_date_phase;
+	discharge_date_r=discharge_date;
+	hospital_days_r=hospital_days;
+	ards_r=ards;
+	pneumo_r=pneumo;
+	vent_r=vent;
+	dialysis_r=dialysis;
+	asthma_r=asthma;
+	diabetes_r=diabetes;
+	hyper_r=hyper;
+	smoke_r=smoke;
+	age_r=age;
+	bmi_num_r=bmi_num;
+	diastolic_first_r=diastolic_first;
+	systolic_first_r=systolic_first;
+
+end;
+else do;
+admit_date_r=admit_date;
+	admit_date_phase_r=admit_date_phase;
+	discharge_date_r=discharge_date;
+	hospital_days_r=hospital_days;
+	ards_r=ards;
+	pneumo_r=pneumo;
+	vent_r=vent;
+	dialysis_r=dialysis;
+	asthma_r=asthma;
+	diabetes_r=diabetes;
+	hyper_r=hyper;
+	smoke_r=smoke;
+	age_r=age;
+	bmi_num_r=bmi_num;
+	diastolic_first_r=diastolic_first;
+	systolic_first_r=systolic_first;
+end;
+end;
+run;
+
+/*Adjacent dates will now have same admit_dates and patient_ids. Sort so we can identify the last one in the group which is the one with the latest discharge. That will be retained*/
+
+PROC SORT
+	DATA=insight_covid_combine_a
+	OUT=insight_covid_combine_sort_a;
+	BY PATID ADMIT_DATE DISCHARGE_DATE;
+RUN;
+
+DATA insight_covid_encounters_nevi_a;
+	SET insight_covid_combine_sort_a;
+	BY patid admit_date discharge_date;
+	IF last.admit_date;
+run;
+
+
+
+data time_diff_a;
+set insight_covid_encounters_nevi_a;
+by patid;
+retain prev_end_date;
+
+time_diff=.;
+
+if first.patid then do;
+prev_end_date=.;
+end;
+
+if not first.patid then do;
+time_diff=admit_date-prev_end_date;
+end;
+
+prev_end_date=discharge_date;
+run;
+
+proc means data=time_diff_a min max;
+var time_diff;
+run;
+
+data flag_a;
+set time_diff_a;
+where .z<time_diff <0;
+run;
+
+data insight_covid_encounters_nevi_2a;
+set insight_covid_encounters_nevi_a;
+drop admit_date_r discharge_date_r;
+run;
+
+data encounter_overlap_test_a;
+set insight_covid_encounters_nevi_2a;
+by patid;
+Retain admit_date_r discharge_date_r ;
+if first.patid then do;
+	admit_date_r=admit_date;
+	discharge_date_r=discharge_date;
+	end;
+ else do;
+	timebw1=admit_date-discharge_date_r;
+	timebw2=discharge_date-discharge_date_r;
+	discharge_date_r=discharge_date;
+	end;
+
+if .z<timebw1<=0 and .z<timebw2<=0 then overlap=1; /*Subsequent encounter fully within prior*/
+else if .z<timebw1<=0 and timebw2=>0 then overlap=2; /*Partial overlap*/
+else if timebw1=>0 and .z<timebw2<=0 then overlap=3; /*Partial overlap*/
+else if timebw1>0 and timebw2>0 then overlap=0; /*Subsequent encounter fully after prior*/
+else overlap=99; 
+run;
+
+proc freq data=encounter_overlap_test_a;
+table overlap/missing;
+run;
+
+/*All subsequent encounters are either fully within or fully after (yay!). Now need to merge the fully within. No need to change admit days or any variables created just using patid or .*/
+/*where we default to using first entry (e.g. BMI, age). However, want to confirm that the first full encounter (admit-discharge) reflects outcomes (ards, pneumo, vent) that happened in overlapping encounters*/
+
+/*Identify those who have conflicting values for outcomes-pneumo, ards, vent and dialysis */
+data temp(rename=(admit_date=_admit_date pneumo=_pneumo));
+set encounter_overlap_test_a;
+if patid eq lag(patid) and overlap =1 and ( (pneumo=1 and lag(pneumo)=0));
+run;
+
+/*Merge subsequent outcome into full encounter*/
+data new (drop=_:);
+merge temp encounter_overlap_test_a;
+by patid;
+if admit_date lt _admit_date then pneumo=_pneumo;
+run;
+
+data temp2(rename=(admit_date=_admit_date ards=_ards));
+set new;
+if patid eq lag(patid) and overlap =1 and ( (ards=1 and lag(ards)=0));
+run;
+
+/*Merge subsequent outcome into full encounter*/
+data new2 (drop=_:);
+merge temp2 new;
+by patid;
+if admit_date lt _admit_date then ards=_ards;
+run;
+
+data temp3(rename=(admit_date=_admit_date vent=_vent)); /*No vent discrepancies*/
+set new2;
+if patid eq lag(patid) and overlap =1 and ( (vent=1 and lag(vent)=0));
+run;
+
+data temp4(rename=(admit_date=_admit_date dialysis=_dialysis)); /*No dialysis discrepancies*/
+set new2;
+if patid eq lag(patid) and overlap =1 and ( (dialysis>0 and lag(dialysis)<=0));
+run;
+
+/*Restrict dataset to only the first encounter now that discrepancies have been corrected*/
+DATA new3;
+	SET new2;
+	if overlap=99 or overlap=0; /*Only want to remove the encounters that are fully within the other encounter; those were flagged with 1 above*/
+run;
+
+/*Check if we eliminated all duplicates*/
+proc sort data=new3;
+by patid admit_date;
+run;
+
+data test;
+set new3;
+by patid;
+
+retain lag_discharge_date;
+
+if first.patid then do;
+diff=.;
+lag_discharge_date=.;
+end;
+
+else diff=admit_date-lag_discharge_date;
+lag_discharge_date=discharge_date;
+run;
+
+proc univariate data=test;
+var diff;
+run;
+
+/*Still have negative differences so rerun another round of code*/
+
+proc sort data=test;
+by patid admit_date;
+run;
+
+data test2;
+set test;
+by patid;
+
+retain has_negative_diff;
+
+if first.patid then do;
+has_negative_diff=0;
+if .<diff<=0 then has_negative_diff=1;
+end;
+else if .<diff<=0 then has_negative_diff=1;
+if last.patid and has_negative_diff=1 then output;
+run;
+
+data test3;
+merge test2 (in=a) test (in=b);
+by patid;
+if a;
+run;
+
+/*Checking that remaining have no negative differences*/
+data test5; /*Changing so not to overwrite test4 which has to be merged back*/
+merge test2 (in=a) test (in=b);
+by patid;
+if ~ a;
+run;
+
+proc means data=test5;
+var diff;
+run;
+
+/*Combine adjacent and then merge those that are fully within*/
+proc sort data=test3;
+by patid admit_date;
+run;
+
+data test3;
+set test3;
+drop overlap timebw1 timebw2 lag_discharge_date diff has_negative_diff admit_date_r discharge_date_r admit_date_phase_r hospital_days_r ards_r pneumo_r vent_r dialysis_r asthma_r diabetes_r hyper_r smoke_r age_r bmi_num_r diastolic_first_r systolic_first_r;
+run;
+
+Data insight_covid_combine;
+SET test3;
+By patid;
+
+Retain admit_date_r discharge_date_r admit_date_phase_r hospital_days_r ards_r pneumo_r vent_r dialysis_r asthma_r diabetes_r hyper_r smoke_r age_r bmi_num_r diastolic_first_r systolic_first_r;
+
+if first.patid then do;
+	admit_date_r=admit_date;
+	admit_date_phase_r=admit_date_phase;
+	discharge_date_r=discharge_date;
+	hospital_days_r=hospital_days;
+	ards_r=ards;
+	pneumo_r=pneumo;
+	vent_r=vent;
+	dialysis_r=dialysis;
+	asthma_r=asthma;
+	diabetes_r=diabetes;
+	hyper_r=hyper;
+	smoke_r=smoke;
+	age_r=age;
+	bmi_num_r=bmi_num;
+	diastolic_first_r=diastolic_first;
+	systolic_first_r=systolic_first;
+	end;
+ else do;
+	if admit_date = discharge_date_r then do;  
+	admit_date=admit_date_r;
+	admit_date_phase=admit_date_phase_r;
+	hospital_days=hospital_days+hospital_days_r; /*Calculate hospital days as sum of encounters*/
+	if ards ne 1 and ards_r=1 then ards=1;		/*If earlier encounter had outcome recorded and it isn't in the later encounter, we recode here*/
+	if pneumo ne 1 and pneumo_r=1 then pneumo=1;
+	if vent ne 1 and vent_r=1 then vent=1;
+	if dialysis in (0,1,2) then dialysis=dialysis; /*If later encounter has 0 or 1 for dialysis, earlier dialysis must be 0 so stays the same. If later encounter has 2, stays same.*/
+		else if dialysis=-1 and dialysis_r = 1 then dialysis=1;       /*If later encounter has -1, could have been from earlier covid encounter. So need to check that dialysis_r ne 1. If is, recode*/
+
+	asthma=asthma_r;													/*Use chronic disease from earlier encounter*/
+	diabetes=diabetes_r;
+	hyper=hyper_r;
+	smoke=smoke_r;
+	age=age_r;
+	bmi_num=bmi_num_r;
+	diastolic_first=diastolic_first_r;
+	systolic_first=systolic_first_r;
+
+	admit_date_r=admit_date;
+	admit_date_phase_r=admit_date_phase;
+	discharge_date_r=discharge_date;
+	hospital_days_r=hospital_days;
+	ards_r=ards;
+	pneumo_r=pneumo;
+	vent_r=vent;
+	dialysis_r=dialysis;
+	asthma_r=asthma;
+	diabetes_r=diabetes;
+	hyper_r=hyper;
+	smoke_r=smoke;
+	age_r=age;
+	bmi_num_r=bmi_num;
+	diastolic_first_r=diastolic_first;
+	systolic_first_r=systolic_first;
+
+end;
+else do;
+admit_date_r=admit_date;
+	admit_date_phase_r=admit_date_phase;
+	discharge_date_r=discharge_date;
+	hospital_days_r=hospital_days;
+	ards_r=ards;
+	pneumo_r=pneumo;
+	vent_r=vent;
+	dialysis_r=dialysis;
+	asthma_r=asthma;
+	diabetes_r=diabetes;
+	hyper_r=hyper;
+	smoke_r=smoke;
+	age_r=age;
+	bmi_num_r=bmi_num;
+	diastolic_first_r=diastolic_first;
+	systolic_first_r=systolic_first;
+end;
+end;
+run;
+
+/*Adjacent dates will now have same admit_dates and patient_ids. Sort so we can identify the last one in the group which is the one with the latest discharge. That will be retained*/
+
+PROC SORT
+	DATA=insight_covid_combine
+	OUT=insight_covid_combine_sort;
+	BY PATID ADMIT_DATE DISCHARGE_DATE;
+RUN;
+
+DATA insight_covid_encounters_nevi;
+	SET insight_covid_combine_sort;
+	BY patid admit_date discharge_date;
+	IF last.admit_date;
+run;
+
+
+
+data time_diff;
+set insight_covid_encounters_nevi;
+by patid;
+retain prev_end_date;
+
+time_diff=.;
+
+if first.patid then do;
+prev_end_date=.;
+end;
+
+if not first.patid then do;
+time_diff=admit_date-prev_end_date;
+end;
+
+prev_end_date=discharge_date;
+run;
+
+proc means data=time_diff min max;
+var time_diff;
+run;
+
+data flag;
+set time_diff;
+where .z<time_diff <0;
+run;
+
+data insight_covid_encounters_nevi_2;
+set insight_covid_encounters_nevi;
+drop admit_date_r discharge_date_r;
+run;
+
+data encounter_overlap_test;
+set insight_covid_encounters_nevi_2;
+by patid;
+Retain admit_date_r discharge_date_r ;
+if first.patid then do;
+	admit_date_r=admit_date;
+	discharge_date_r=discharge_date;
+	end;
+ else do;
+	timebw1=admit_date-discharge_date_r;
+	timebw2=discharge_date-discharge_date_r;
+	discharge_date_r=discharge_date;
+	end;
+
+if .z<timebw1<=0 and .z<timebw2<=0 then overlap=1; /*Subsequent encounter fully within prior*/
+else if .z<timebw1<=0 and timebw2=>0 then overlap=2; /*Partial overlap*/
+else if timebw1=>0 and .z<timebw2<=0 then overlap=3; /*Partial overlap*/
+else if timebw1>0 and timebw2>0 then overlap=0; /*Subsequent encounter fully after prior*/
+else overlap=99; 
+run;
+
+proc freq data=encounter_overlap_test;
+table overlap/missing;
+run;
+
+/*All subsequent encounters are either fully within or fully after (yay!). Now need to merge the fully within. No need to change admit days or any variables created just using patid or .*/
+/*where we default to using first entry (e.g. BMI, age). However, want to confirm that the first full encounter (admit-discharge) reflects outcomes (ards, pneumo, vent) that happened in overlapping encounters*/
+
+/*Identify those who have conflicting values for outcomes-pneumo, ards, vent and dialysis */
+data temp(rename=(admit_date=_admit_date pneumo=_pneumo));
+set encounter_overlap_test;
+if patid eq lag(patid) and overlap =1 and ( (pneumo=1 and lag(pneumo)=0));
+run;
+
+/*Merge subsequent outcome into full encounter*/
+data new (drop=_:);
+merge temp encounter_overlap_test;
+by patid;
+if admit_date lt _admit_date then pneumo=_pneumo;
+run;
+
+data temp2(rename=(admit_date=_admit_date ards=_ards));
+set new;
+if patid eq lag(patid) and overlap =1 and ( (ards=1 and lag(ards)=0));
+run;
+
+/*Merge subsequent outcome into full encounter*/
+data new2 (drop=_:);
+merge temp2 new;
+by patid;
+if admit_date lt _admit_date then ards=_ards;
+run;
+
+data temp3(rename=(admit_date=_admit_date vent=_vent)); /*No vent discrepancies*/
+set new2;
+if patid eq lag(patid) and overlap =1 and ( (vent=1 and lag(vent)=0));
+run;
+
+data temp4(rename=(admit_date=_admit_date dialysis=_dialysis)); /*No dialysis discrepancies*/
+set new2;
+if patid eq lag(patid) and overlap =1 and ( (dialysis>0 and lag(dialysis)<=0));
+run;
+
+/*Restrict dataset to only the first encounter now that discrepancies have been corrected*/
+DATA new3;
+	SET new2;
+	if overlap=99 or overlap=0; /*Only want to remove the encounters that are fully within the other encounter; those were flagged with 1 above*/
+run;
+
+/*Need to run another round*/
+proc sort data=new3;
+by patid admit_date;
+run;
+
+data test3;
+set test3;
+drop overlap timebw1 timebw2 lag_discharge_date diff has_negative_diff admit_date_r discharge_date_r admit_date_phase_r hospital_days_r ards_r pneumo_r vent_r dialysis_r asthma_r diabetes_r hyper_r smoke_r age_r bmi_num_r diastolic_first_r systolic_first_r;
+run;
+
+data test;
+set new3;
+by patid;
+
+retain lag_discharge_date;
+
+if first.patid then do;
+diff=.;
+lag_discharge_date=.;
+end;
+
+else diff=admit_date-lag_discharge_date;
+lag_discharge_date=discharge_date;
+run;
+
+proc univariate data=test;
+var diff;
+run;
+
+/*Still have negative and zero differences so rerun another round of code*/
+
+proc sort data=test;
+by patid admit_date;
+run;
+
+data test2;
+set test;
+by patid;
+
+retain has_negative_diff;
+
+if first.patid then do;
+has_negative_diff=0;
+if .<diff<=0 then has_negative_diff=1;
+end;
+else if .<diff<=0 then has_negative_diff=1;
+if last.patid and has_negative_diff=1 then output;
+run;
+
+data test3;
+merge test2 (in=a) test (in=b);
+by patid;
+if a;
+run;
+
+/*Checking that remaining have no negative differences*/
+data test6; /*Changing so not to overwrite test5 which has to be merged back*/
+merge test2 (in=a) test (in=b);
+by patid;
+if ~ a;
+run;
+
+proc means data=test6;
+var diff;
+run;
+
+/*Combine adjacent and then merge those that are fully within*/
+proc sort data=test3;
+by patid admit_date;
+run;
+
+data test3;
+set test3;
+drop admit_date_r discharge_date_r admit_date_phase_r hospital_days_r ards_r pneumo_r vent_r dialysis_r asthma_r diabetes_r hyper_r smoke_r age_r bmi_num_r diastolic_first_r systolic_first_r;
+run;
+
+Data insight_covid_combine;
+SET test3;
+By patid;
+
+Retain admit_date_r discharge_date_r admit_date_phase_r hospital_days_r ards_r pneumo_r vent_r dialysis_r asthma_r diabetes_r hyper_r smoke_r age_r bmi_num_r diastolic_first_r systolic_first_r;
+
+if first.patid then do;
+	admit_date_r=admit_date;
+	admit_date_phase_r=admit_date_phase;
+	discharge_date_r=discharge_date;
+	hospital_days_r=hospital_days;
+	ards_r=ards;
+	pneumo_r=pneumo;
+	vent_r=vent;
+	dialysis_r=dialysis;
+	asthma_r=asthma;
+	diabetes_r=diabetes;
+	hyper_r=hyper;
+	smoke_r=smoke;
+	age_r=age;
+	bmi_num_r=bmi_num;
+	diastolic_first_r=diastolic_first;
+	systolic_first_r=systolic_first;
+	end;
+ else do;
+	if admit_date = discharge_date_r then do;  
+	admit_date=admit_date_r;
+	admit_date_phase=admit_date_phase_r;
+	hospital_days=hospital_days+hospital_days_r; /*Calculate hospital days as sum of encounters*/
+	if ards ne 1 and ards_r=1 then ards=1;		/*If earlier encounter had outcome recorded and it isn't in the later encounter, we recode here*/
+	if pneumo ne 1 and pneumo_r=1 then pneumo=1;
+	if vent ne 1 and vent_r=1 then vent=1;
+	if dialysis in (0,1,2) then dialysis=dialysis; /*If later encounter has 0 or 1 for dialysis, earlier dialysis must be 0 so stays the same. If later encounter has 2, stays same.*/
+		else if dialysis=-1 and dialysis_r = 1 then dialysis=1;       /*If later encounter has -1, could have been from earlier covid encounter. So need to check that dialysis_r ne 1. If is, recode*/
+
+	asthma=asthma_r;													/*Use chronic disease from earlier encounter*/
+	diabetes=diabetes_r;
+	hyper=hyper_r;
+	smoke=smoke_r;
+	age=age_r;
+	bmi_num=bmi_num_r;
+	diastolic_first=diastolic_first_r;
+	systolic_first=systolic_first_r;
+
+	admit_date_r=admit_date;
+	admit_date_phase_r=admit_date_phase;
+	discharge_date_r=discharge_date;
+	hospital_days_r=hospital_days;
+	ards_r=ards;
+	pneumo_r=pneumo;
+	vent_r=vent;
+	dialysis_r=dialysis;
+	asthma_r=asthma;
+	diabetes_r=diabetes;
+	hyper_r=hyper;
+	smoke_r=smoke;
+	age_r=age;
+	bmi_num_r=bmi_num;
+	diastolic_first_r=diastolic_first;
+	systolic_first_r=systolic_first;
+
+end;
+else do;
+admit_date_r=admit_date;
+	admit_date_phase_r=admit_date_phase;
+	discharge_date_r=discharge_date;
+	hospital_days_r=hospital_days;
+	ards_r=ards;
+	pneumo_r=pneumo;
+	vent_r=vent;
+	dialysis_r=dialysis;
+	asthma_r=asthma;
+	diabetes_r=diabetes;
+	hyper_r=hyper;
+	smoke_r=smoke;
+	age_r=age;
+	bmi_num_r=bmi_num;
+	diastolic_first_r=diastolic_first;
+	systolic_first_r=systolic_first;
+end;
+end;
+run;
+
+/*Adjacent dates will now have same admit_dates and patient_ids. Sort so we can identify the last one in the group which is the one with the latest discharge. That will be retained*/
+
+PROC SORT
+	DATA=insight_covid_combine
+	OUT=insight_covid_combine_sort;
+	BY PATID ADMIT_DATE DISCHARGE_DATE;
+RUN;
+
+DATA insight_covid_encounters_nevi;
+	SET insight_covid_combine_sort;
+	BY patid admit_date discharge_date;
+	IF last.admit_date;
+run;
+
+
+
+data time_diff;
+set insight_covid_encounters_nevi;
+by patid;
+retain prev_end_date;
+
+time_diff=.;
+
+if first.patid then do;
+prev_end_date=.;
+end;
+
+if not first.patid then do;
+time_diff=admit_date-prev_end_date;
+end;
+
+prev_end_date=discharge_date;
+run;
+
+proc means data=time_diff min max;
+var time_diff;
+run;
+
+data flag;
+set time_diff;
+where .z<time_diff <0;
+run;
+
+data insight_covid_encounters_nevi_2;
+set insight_covid_encounters_nevi;
+drop admit_date_r discharge_date_r;
+run;
+
+data encounter_overlap_test;
+set insight_covid_encounters_nevi_2;
+by patid;
+Retain admit_date_r discharge_date_r ;
+if first.patid then do;
+	admit_date_r=admit_date;
+	discharge_date_r=discharge_date;
+	end;
+ else do;
+	timebw1=admit_date-discharge_date_r;
+	timebw2=discharge_date-discharge_date_r;
+	discharge_date_r=discharge_date;
+	end;
+
+if .z<timebw1<=0 and .z<timebw2<=0 then overlap=1; /*Subsequent encounter fully within prior*/
+else if .z<timebw1<=0 and timebw2=>0 then overlap=2; /*Partial overlap*/
+else if timebw1=>0 and .z<timebw2<=0 then overlap=3; /*Partial overlap*/
+else if timebw1>0 and timebw2>0 then overlap=0; /*Subsequent encounter fully after prior*/
+else overlap=99; 
+run;
+
+proc freq data=encounter_overlap_test;
+table overlap/missing;
+run;
+
+/*All subsequent encounters are either fully within or fully after (yay!). Now need to merge the fully within. No need to change admit days or any variables created just using patid or .*/
+/*where we default to using first entry (e.g. BMI, age). However, want to confirm that the first full encounter (admit-discharge) reflects outcomes (ards, pneumo, vent) that happened in overlapping encounters*/
+
+/*Identify those who have conflicting values for outcomes-pneumo, ards, vent and dialysis */
+data temp(rename=(admit_date=_admit_date pneumo=_pneumo));
+set encounter_overlap_test;
+if patid eq lag(patid) and overlap =1 and ( (pneumo=1 and lag(pneumo)=0));
+run;
+
+/*Merge subsequent outcome into full encounter*/
+data new (drop=_:);
+merge temp encounter_overlap_test;
+by patid;
+if admit_date lt _admit_date then pneumo=_pneumo;
+run;
+
+data temp2(rename=(admit_date=_admit_date ards=_ards));
+set new;
+if patid eq lag(patid) and overlap =1 and ( (ards=1 and lag(ards)=0));
+run;
+
+/*Merge subsequent outcome into full encounter*/
+data new2 (drop=_:);
+merge temp2 new;
+by patid;
+if admit_date lt _admit_date then ards=_ards;
+run;
+
+data temp3(rename=(admit_date=_admit_date vent=_vent)); /*No vent discrepancies*/
+set new2;
+if patid eq lag(patid) and overlap =1 and ( (vent=1 and lag(vent)=0));
+run;
+
+data temp4(rename=(admit_date=_admit_date dialysis=_dialysis)); /*No dialysis discrepancies*/
+set new2;
+if patid eq lag(patid) and overlap =1 and ( (dialysis>0 and lag(dialysis)<=0));
+run;
+
+/*Restrict dataset to only the first encounter now that discrepancies have been corrected*/
+DATA new3;
+	SET new2;
+	if overlap=99 or overlap=0; /*Only want to remove the encounters that are fully within the other encounter; those were flagged with 1 above*/
+run;
+
+/*Need to merge datasets containing cleaned data*/
+
+data all_nondup;
+set new3 test_4a test5 test6;
+run;
+
+/*Code to check if all overlapping/adjacent encounters have been cleaned*/
+proc sort data=all_nondup;
+by patid admit_date;
+run;
+
+data all_nondup;
+set all_nondup;
+drop diff lag_discharge_date;
+run;
+
+data check;
+set all_nondup;
+by patid;
+
+retain lag_discharge_date;
+if first.patid then do;
+diff=.;
+lag_discharge_date=.;
+end;
+
+else diff=admit_date-lag_discharge_date;
+lag_discharge_date=discharge_date;
+run;
+
+proc means data=check;
+var diff; /*All positive differences greater than 0*/
+run;
+
+proc sql;
+select count( distinct patid) as unique_count
+from check;
+quit;
+
+data DataCong.insight_covid_encounters_nevi; /*Save final analytic dataset and drop unneeded variables*/
+set all_nondup;
 drop admit_time admit_date_time discharge_time discharge_date_time admit_px_gap_vent admit_px_gap_dialysis admit_dx_gap_ards admit_dx_gap_pneumo admit_measure_gap_smk measure_date: ht_median wt_median original_bmi_median height weight bmi_cat admit_date_r discharge_date_r
 hospital_days_r ards_r pneumo_r vent_r dialysis_r asthma_r diabetes_r hyper_r smoke_r age_r bmi_num_r diastolic_first_r systolic_first_r admit_date_phase_r overlap; 
 run;

@@ -3,7 +3,7 @@ This repository contains code created and used as part of the Race, Ethnicity an
 
 Data sources include
 * Publicly-available data on COVID19 in NYC (public)
-* Neighborhood Environmental Vulnerability Index (public and accessible at github.com/jstingone/nevi). Contains reference to:
+* Neighborhood Environmental Vulnerability Index (public and accessible [here] (https://github.com/jstingone/nevi)). Contains reference to:
 	* US Census Data (public)
 	* CDC Places Project data (public)
 * Hospitalization data from the INSIGHT Clinical Research Network (https://insightcrn.org/ for access procedures)
