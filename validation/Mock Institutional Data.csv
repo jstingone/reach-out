@@ -1,0 +1,6 @@
+person_id,encounter_id,visit_start_date,visit_end_date,death_date,visit_concept_id,covid_diagnosis_date,covid_diagnosis_result,covid_test_date,covid_test_type,covid_test_result,zipcode,age,sex,race,ethinicity,bmi_measure_time,bmi,smoke_contact_date,smoking_status,diabetes,asthma
+1000000001,1234567,1/10/2021,1/30/2021,1/30/2021,262,1/10/2021,Positive,1/10/2021,SARS COV 2 RT-PCR,Detected,12345,65,Female,Asian,Asian,2021-01-10T23:22:00Z,35.32,1/10/2021,Former Smoker,Positive,Positive
+1000000002,2345678,2/21/2021,3/20/2021,NA,262,2/22/2021,Positive,2/22/2021,SARS COV 2 RT-PCR,Detected,23456,32,Male,Black,AfricanAmerican,2021-02-21T12:10:00Z,25.78,2/21/2021,Never Smoker,Positive,Negative
+1000000003,3456789,10/11/2020,12/20/2020,NA,262,10/11/2020,Positive,10/11/2020,SARS COV 2 RT-PCR,Detected,34567,75,Female,Latino,HispanicLatino,2020-10-11T12:54:00Z,38.25,10/11/2020,Never Assessed,Negative,Positive
+1000000004,4567890,12/5/2020,2/10/2021,NA,262,12/4/2020,Positive,12/4/2020,SARS COV 2 RT-PCR,Detected,45678,70,Female,White,Caucasian,2020-12-05T16:56:00Z,35.39,12/5/2020,Former Smoker,Positive,Positive
+1000000001,5678901,5/15/2021,7/20/2021,NA,262,5/15/2021,Positive,5/15/2021,SARS COV 2 RT-PCR,Detected,56789,59,Male,Black,AfricanAmerican,2021-05-15T01:49:00Z,29.58,5/15/2021,Never Smoker,Negative,Negative

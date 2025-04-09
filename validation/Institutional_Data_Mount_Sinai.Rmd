@@ -1,0 +1,85 @@
+---
+title: "Institutional Data Analysis"
+author: "Cong Zhang"
+date: "3/5/2022"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include = FALSE, message = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = TRUE, cache = TRUE)
+
+# Please install the following packages.
+library(tidyverse)
+library(visdat)
+library(sqldf)
+
+knitr::opts_chunk$set(
+	fig.width = 6, 
+  fig.asp = .6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+set.seed(1)
+```
+
+
+### Institution Data.
+
+```{r Institution Data}
+# Please substitute the value(s) of file location(s) with the path to the file on your computer.
+# Be sure to include a / sign at the end of the path!
+file_location_sinai_encounter = "D:/Projects/EPI REACH OUT Study/Institutional Data/data/"
+
+# Please substitute the value(s) of file name(s) with the name of the file on your computer.
+# Be sure to convert your file to the csv format!
+file_name_sinai_encounter = "Mock_Data.csv"
+
+# Import Data
+mount_sinai_encounter = read_csv(paste(file_location_sinai_encounter, file_name_sinai_encounter, sep = "")) %>% 
+  janitor::clean_names() %>%   
+  select(age, zipcode, sex, race, ethnicity, bmi, smoking_status)
+
+
+# Data Types
+vis_dat(mount_sinai_encounter)
+
+
+# Missing Data
+vis_miss(mount_sinai_encounter, warn_large_data = FALSE) +
+  theme(axis.text.x = element_text(angle = 70))
+
+
+# Bar Plots
+ggplot(mount_sinai_encounter, aes(x = age)) + 
+  geom_bar() +
+  stat_count(geom = "text", aes(label = stat(count)), position="fill", colour="white")  
+
+ggplot(mount_sinai_encounter, aes(x = zipcode)) + 
+  geom_bar() +
+  stat_count(geom = "text", aes(label = stat(count)), position="fill", colour="white")
+
+ggplot(mount_sinai_encounter, aes(x = sex)) + 
+  geom_bar() +
+  stat_count(geom = "text", aes(label = stat(count)), position="fill", colour="white")
+
+ggplot(mount_sinai_encounter, aes(x = race)) + 
+  geom_bar() +
+  stat_count(geom = "text", aes(label = stat(count)), position="fill", colour="white")
+
+ggplot(mount_sinai_encounter, aes(x = ethnicity)) + 
+  geom_bar() +
+  stat_count(geom = "text", aes(label = stat(count)), position="fill", colour="white")
+
+ggplot(mount_sinai_encounter, aes(x = bmi)) + 
+  geom_bar() +
+  stat_count(geom = "text", aes(label = stat(count)), position="fill", colour="white")
+
+ggplot(mount_sinai_encounter, aes(x = smoking_status)) + 
+  geom_bar() +
+  stat_count(geom = "text", aes(label = stat(count)), position="fill", colour="white")
+```
+

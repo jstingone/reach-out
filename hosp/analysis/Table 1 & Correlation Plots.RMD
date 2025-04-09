@@ -1,0 +1,145 @@
+---
+title: "Table 1 & Correlation Plots"
+author: "Sneha Kannoth"
+date: "2024-02-20"
+output: html_document
+---
+
+# A Run Data Processing Script
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing.R")
+```
+
+# B Load libraries
+
+```{r}
+library(broom)
+require(table1)
+library(readxl)
+library(corrplot)
+```
+
+# C Table 1 Code
+
+```{r}
+
+# Full Data
+table1(~ age + factor(sex) + factor(race) + factor(hispanic) + factor(bmi_cat) + factor(smoke) + factor(asthma) + factor(diabetes) + factor(hyper) + factor(ards) + factor(pneumo) + factor(dialysis) + factor(vent) + factor(death), data = km_df)
+
+# Phase 1
+table1(~ age + factor(sex) + factor(race) + factor(hispanic) + factor(bmi_cat) + factor(smoke) + factor(asthma) + factor(diabetes) + factor(hyper) + factor(ards) + factor(pneumo) + factor(dialysis) + factor(vent) + factor(death), data = coxph_phase1_df)
+
+# Phase 1 (40% Coverage)
+table1(~ age + factor(sex) + factor(race) + factor(hispanic) + factor(bmi_cat) + factor(smoke) + factor(asthma) + factor(diabetes) + factor(hyper) + factor(ards) + factor(pneumo) + factor(dialysis) + factor(vent) + factor(death), data = coxph_phase1_40cov)
+
+# Phase 2 & 3
+table1(~ age + factor(sex) + factor(race) + factor(hispanic) + factor(bmi_cat) + factor(smoke) + factor(asthma) + factor(diabetes) + factor(hyper) + factor(ards) + factor(pneumo) + factor(dialysis) + factor(vent) + factor(death), data = coxph_phase2and3_df)
+
+# Phase 2 & 3 (40% Coverage)
+table1(~ age + factor(sex) + factor(race) + factor(hispanic) + factor(bmi_cat) + factor(smoke) + factor(asthma) + factor(diabetes) + factor(hyper) + factor(ards) + factor(pneumo) + factor(dialysis) + factor(vent) + factor(death), data = coxph_phase2and3_40cov)
+
+```
+
+# D Run Data Processing Script (without centering for pollutants & NEVI)
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing No Centering.R")
+```
+
+# E Table 1 Code (Air Pollutants & NEVI)
+
+```{r}
+# Full Data
+table1(~ bc_avg + pm_avg + no2_avg + o3_avg + nevi + score_demo + score_economic + score_residential + score_healthstatus, data = km_df)
+
+# Full Data IQR
+summary(km_df$bc_avg)
+summary(km_df$pm_avg)
+summary(km_df$no2_avg)
+summary(km_df$o3_avg)
+summary(km_df$nevi)
+summary(km_df$score_demo)
+summary(km_df$score_economic)
+summary(km_df$score_residential)
+summary(km_df$score_healthstatus)
+
+# Phase 1
+table1(~ bc_avg + pm_avg + no2_avg + o3_avg + nevi + score_demo + score_economic + score_residential + score_healthstatus, data = coxph_phase1_df)
+
+# Phase 1 IQR
+summary(coxph_phase1_df$bc_avg)
+summary(coxph_phase1_df$pm_avg)
+summary(coxph_phase1_df$no2_avg)
+summary(coxph_phase1_df$o3_avg)
+summary(coxph_phase1_df$nevi)
+summary(coxph_phase1_df$score_demo)
+summary(coxph_phase1_df$score_economic)
+summary(coxph_phase1_df$score_residential)
+summary(coxph_phase1_df$score_healthstatus)
+
+# Phase 1 (40% Coverage)
+table1(~ bc_avg + pm_avg + no2_avg + o3_avg + nevi + score_demo + score_economic + score_residential + score_healthstatus, data = coxph_phase1_40cov)
+
+# Phase 1 (40% Coverage) IQR
+summary(coxph_phase1_40cov$bc_avg)
+summary(coxph_phase1_40cov$pm_avg)
+summary(coxph_phase1_40cov$no2_avg)
+summary(coxph_phase1_40cov$o3_avg)
+summary(coxph_phase1_40cov$nevi)
+summary(coxph_phase1_40cov$score_demo)
+summary(coxph_phase1_40cov$score_economic)
+summary(coxph_phase1_40cov$score_residential)
+summary(coxph_phase1_40cov$score_healthstatus)
+
+# Phase 2 & 3
+table1(~ bc_avg + pm_avg + no2_avg + o3_avg + nevi + score_demo + score_economic + score_residential + score_healthstatus, data = coxph_phase2and3_df)
+
+# Phase 2 & 3 IQR
+summary(coxph_phase2and3_df$bc_avg)
+summary(coxph_phase2and3_df$pm_avg)
+summary(coxph_phase2and3_df$no2_avg)
+summary(coxph_phase2and3_df$o3_avg)
+summary(coxph_phase2and3_df$nevi)
+summary(coxph_phase2and3_df$score_demo)
+summary(coxph_phase2and3_df$score_economic)
+summary(coxph_phase2and3_df$score_residential)
+summary(coxph_phase2and3_df$score_healthstatus)
+
+# Phase 2 & 3 (40% Coverage)
+table1(~ bc_avg + pm_avg + no2_avg + o3_avg + nevi + score_demo + score_economic + score_residential + score_healthstatus, data = coxph_phase2and3_40cov)
+
+# Phase 2 & 3 (40% Coverage) IQR
+summary(coxph_phase2and3_40cov$bc_avg)
+summary(coxph_phase2and3_40cov$pm_avg)
+summary(coxph_phase2and3_40cov$no2_avg)
+summary(coxph_phase2and3_40cov$o3_avg)
+summary(coxph_phase2and3_40cov$nevi)
+summary(coxph_phase2and3_40cov$score_demo)
+summary(coxph_phase2and3_40cov$score_economic)
+summary(coxph_phase2and3_40cov$score_residential)
+summary(coxph_phase2and3_40cov$score_healthstatus)
+```
+
+
+# F Run Original Data Processing Script
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing.R")
+```
+
+# G Import File with NEVI & AP Averages (2009-2019) by NYC Zip Code
+```{r}
+NEVI_APAvg <- read_excel("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Cong/Datasets/AP&NEVI_Merged.xlsx", 
+                       sheet = "NEVI&APAvg")
+```
+
+# H Correlation Plot Analyses
+```{r}
+NEVI_APAvg$ZIPCODE <- NULL
+nevi_ap <- cor(NEVI_APAvg, method = "spearman")
+head(round(nevi_ap, 2))
+
+corrplot(nevi_ap, method = "circle")
+corrplot(nevi_ap, method = "color")
+corrplot(nevi_ap, method = "number")
+
+```
+

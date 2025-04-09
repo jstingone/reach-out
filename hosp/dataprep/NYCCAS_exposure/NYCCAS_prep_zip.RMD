@@ -1,0 +1,357 @@
+---
+title: "NYCAS Data Processing"
+software: "R v4.2.2"
+author: "JAS"
+date: "January 19, 2023"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Creating pollution data by Census tract
+
+This code creates the average pollution values per year for each ZIP Code in NYC, from 2009-2020.
+
+* Using NYCCAS Data released April 2022. Available at: https://data.cityofnewyork.us/Environment/NYCCAS-Air-Pollution-Rasters/q68s-8qxv
+
+* Using 2010 NYC ZCTA Shapefile from GIS Lab at Newman Library, Baruch CUNY. Available at: https://geo.nyu.edu/catalog/nyu-2451-34509
+
+Notes: Code is not very elegant. Could go back and make functions since repeated same steps repeatedly.
+
+
+```{r dataprep}
+#install.packages("rgdal")
+#install.packages("raster")
+#install.packages("ggplot2")
+
+
+library(raster)
+library(rgdal)
+library(ggplot2)
+library(sp)
+library(sf)
+library(dplyr)
+library(RColorBrewer)
+library(data.table)
+library(tidyverse)
+
+# Read this shape file with the rgdal library. 
+ct2010<-st_read("C:/users/js5406/Downloads/nyu_2451_34509/nyu_2451_34509.shp")
+
+#Read-in ZCTA file here 
+
+#Read in rastar pollutant files
+pm2009<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa1_pm300m/w001001.adf")
+bc2009<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa1_bc300m/w001001.adf")
+no22009<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa1_no2300m/w001001.adf")
+o32009<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/s1_o3300m/w001001.adf")
+so22009<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/w1_so2300m/w001001.adf")
+
+pm2010<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa2_pm300m/w001001.adf")
+bc2010<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa2_bc300m/w001001.adf")
+no22010<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa2_no2300m/w001001.adf")
+o32010<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/s2_o3300m/w001001.adf")
+so22010<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/w2_so2300m/w001001.adf")
+
+pm2011<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa3_pm300m/w001001.adf")
+bc2011<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa3_bc300m/w001001.adf")
+no22011<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa3_no2300m/w001001.adf")
+o32011<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/s3_o3300m/w001001.adf")
+so22011<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/w3_so2300m/w001001.adf")
+
+pm2012<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa4_pm300m/w001001.adf")
+bc2012<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa4_bc300m/w001001.adf")
+no22012<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa4_no2300m/w001001.adf")
+o32012<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/s4_o3300m/w001001.adf")
+so22012<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/w4_so2300m/w001001.adf")
+
+pm2013<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa5_pm300m/w001001.adf")
+bc2013<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa5_bc300m/w001001.adf")
+no22013<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa5_no2300m/w001001.adf")
+o32013<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/s5_o3300m/w001001.adf")
+so22013<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/w5_so2300m/w001001.adf")
+
+pm2014<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa6_pm300m/w001001.adf")
+bc2014<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa6_bc300m/w001001.adf")
+no22014<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa6_no2300m/w001001.adf")
+o32014<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/s6_o3300m/w001001.adf")
+so22014<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/w6_so2300m/w001001.adf")
+
+pm2015<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa7_pm300m/w001001.adf")
+bc2015<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa7_bc300m/w001001.adf")
+no22015<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa7_no2300m/w001001.adf")
+o32015<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/s7_o3300m/w001001.adf")
+so22015<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/w7_so2300m/w001001.adf")
+
+pm2016<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa8_pm300m/w001001.adf")
+bc2016<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa8_bc300m/w001001.adf")
+no22016<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa8_no2300m/w001001.adf")
+o32016<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/s8_o3300m/w001001.adf")
+so22016<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/w8_so2300m/w001001.adf")
+
+pm2017<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa9_pm300m/w001001.adf")
+bc2017<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa9_bc300m/w001001.adf")
+no22017<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa9_no2300m/w001001.adf")
+o32017<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/s9_o3300m/w001001.adf")
+
+pm2018<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa10_pm300m/w001001.adf")
+bc2018<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa10_bc300m/w001001.adf")
+no22018<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/aa10_no2300m/w001001.adf")
+o32018<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/AnnAvg1_10_300mRaster/s10_o3300m/w001001.adf")
+
+pm2019<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/aa11_pm300m/w001001.adf")
+bc2019<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/aa11_bc300m/w001001.adf")
+no22019<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/aa11_no2300m/w001001.adf")
+o32019<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/AnnAvg1_11_300mRaster/s11_o3300m/w001001.adf")
+
+pm2020<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/aa12_pm300m/w001001.adf")
+bc2020<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/aa12_bc300m/w001001.adf")
+no22020<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/aa12_no2300m/w001001.adf")
+o32020<-raster("C:/Users/js5406/Downloads/AnnAvg1_12_300mRaster/s12_o3300m/w001001.adf")
+```
+
+### Aggregate raster to ZCTA
+
+
+
+```{r agg_ct2010}
+int.data<-raster::extract(pm2009, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.bc<-raster::extract(bc2009, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.no2<-raster::extract(no22009, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+int.data.o3<-raster::extract(o32009, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.so2<-raster::extract(so22009, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+
+colnames(int.data)<-c("ID", "PM.09")
+colnames(int.data.bc)<-c("ID", "BC.09")
+colnames(int.data.no2)<-c("ID", "NO2.09")
+colnames(int.data.o3)<-c("ID", "O3.09")
+colnames(int.data.so2)<-c("ID", "SO2.09")
+
+poll.data.ct2010<-data.frame(ct2010=ct2010$zcta, int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+keep.var<-c("ct2010", "PM.09", "BC.09", "NO2.09", "O3.09", "SO2.09")
+
+poll.ct2010.09<-poll.data.ct2010[,keep.var]
+rm(int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+int.data<-raster::extract(pm2010, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.bc<-raster::extract(bc2010, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.no2<-raster::extract(no22010, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+int.data.o3<-raster::extract(o32010, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.so2<-raster::extract(so22010, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+
+colnames(int.data)<-c("ID", "PM.10")
+colnames(int.data.bc)<-c("ID", "BC.10")
+colnames(int.data.no2)<-c("ID", "NO2.10")
+colnames(int.data.o3)<-c("ID", "O3.10")
+colnames(int.data.so2)<-c("ID", "SO2.10")
+
+poll.data.ct2010<-data.frame(ct2010=ct2010$zcta, int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+keep.var<-c("ct2010", "PM.10", "BC.10", "NO2.10", "O3.10", "SO2.10")
+
+poll.ct2010.10<-poll.data.ct2010[,keep.var]
+rm(int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+int.data<-raster::extract(pm2011, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.bc<-raster::extract(bc2011, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.no2<-raster::extract(no22011, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+int.data.o3<-raster::extract(o32011, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.so2<-raster::extract(so22011, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+
+colnames(int.data)<-c("ID", "PM.11")
+colnames(int.data.bc)<-c("ID", "BC.11")
+colnames(int.data.no2)<-c("ID", "NO2.11")
+colnames(int.data.o3)<-c("ID", "O3.11")
+colnames(int.data.so2)<-c("ID", "SO2.11")
+
+poll.data.ct2010<-data.frame(ct2010=ct2010$zcta, int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+keep.var<-c("ct2010", "PM.11", "BC.11", "NO2.11", "O3.11", "SO2.11")
+
+poll.ct2010.11<-poll.data.ct2010[,keep.var]
+rm(int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+int.data<-raster::extract(pm2012, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.bc<-raster::extract(bc2012, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.no2<-raster::extract(no22012, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+int.data.o3<-raster::extract(o32012, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.so2<-raster::extract(so22012, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+
+colnames(int.data)<-c("ID", "PM.12")
+colnames(int.data.bc)<-c("ID", "BC.12")
+colnames(int.data.no2)<-c("ID", "NO2.12")
+colnames(int.data.o3)<-c("ID", "O3.12")
+colnames(int.data.so2)<-c("ID", "SO2.12")
+
+poll.data.ct2010<-data.frame(ct2010=ct2010$zcta, int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+keep.var<-c("ct2010", "PM.12", "BC.12", "NO2.12", "O3.12", "SO2.12")
+
+poll.ct2010.12<-poll.data.ct2010[,keep.var]
+rm(int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+int.data<-raster::extract(pm2013, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.bc<-raster::extract(bc2013, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.no2<-raster::extract(no22013, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+int.data.o3<-raster::extract(o32013, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.so2<-raster::extract(so22013, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+
+colnames(int.data)<-c("ID", "PM.13")
+colnames(int.data.bc)<-c("ID", "BC.13")
+colnames(int.data.no2)<-c("ID", "NO2.13")
+colnames(int.data.o3)<-c("ID", "O3.13")
+colnames(int.data.so2)<-c("ID", "SO2.13")
+
+poll.data.ct2010<-data.frame(ct2010=ct2010$zcta, int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+keep.var<-c("ct2010", "PM.13", "BC.13", "NO2.13", "O3.13", "SO2.13")
+
+poll.ct2010.13<-poll.data.ct2010[,keep.var]
+rm(int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+int.data<-raster::extract(pm2014, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.bc<-raster::extract(bc2014, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.no2<-raster::extract(no22014, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+int.data.o3<-raster::extract(o32014, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.so2<-raster::extract(so22014, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+
+colnames(int.data)<-c("ID", "PM.14")
+colnames(int.data.bc)<-c("ID", "BC.14")
+colnames(int.data.no2)<-c("ID", "NO2.14")
+colnames(int.data.o3)<-c("ID", "O3.14")
+colnames(int.data.so2)<-c("ID", "SO2.14")
+
+poll.data.ct2010<-data.frame(ct2010=ct2010$zcta, int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+keep.var<-c("ct2010", "PM.14", "BC.14", "NO2.14", "O3.14", "SO2.14")
+
+poll.ct2010.14<-poll.data.ct2010[,keep.var]
+rm(int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+int.data<-raster::extract(pm2015, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.bc<-raster::extract(bc2015, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.no2<-raster::extract(no22015, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+int.data.o3<-raster::extract(o32015, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.so2<-raster::extract(so22015, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+
+colnames(int.data)<-c("ID", "PM.15")
+colnames(int.data.bc)<-c("ID", "BC.15")
+colnames(int.data.no2)<-c("ID", "NO2.15")
+colnames(int.data.o3)<-c("ID", "O3.15")
+colnames(int.data.so2)<-c("ID", "SO2.15")
+
+poll.data.ct2010<-data.frame(ct2010=ct2010$zcta, int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+keep.var<-c("ct2010", "PM.15", "BC.15", "NO2.15", "O3.15", "SO2.15")
+
+poll.ct2010.15<-poll.data.ct2010[,keep.var]
+rm(int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+int.data<-raster::extract(pm2016, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.bc<-raster::extract(bc2016, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.no2<-raster::extract(no22016, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+int.data.o3<-raster::extract(o32016, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.so2<-raster::extract(so22016, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+
+colnames(int.data)<-c("ID", "PM.16")
+colnames(int.data.bc)<-c("ID", "BC.16")
+colnames(int.data.no2)<-c("ID", "NO2.16")
+colnames(int.data.o3)<-c("ID", "O3.16")
+colnames(int.data.so2)<-c("ID", "SO2.16")
+
+poll.data.ct2010<-data.frame(ct2010=ct2010$zcta, int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+keep.var<-c("ct2010", "PM.16", "BC.16", "NO2.16", "O3.16", "SO2.16")
+
+poll.ct2010.16<-poll.data.ct2010[,keep.var]
+rm(int.data, int.data.bc, int.data.no2, int.data.o3, int.data.so2)
+
+int.data<-raster::extract(pm2017, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.bc<-raster::extract(bc2017, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.no2<-raster::extract(no22017, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+int.data.o3<-raster::extract(o32017, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+
+colnames(int.data)<-c("ID", "PM.17")
+colnames(int.data.bc)<-c("ID", "BC.17")
+colnames(int.data.no2)<-c("ID", "NO2.17")
+colnames(int.data.o3)<-c("ID", "O3.17")
+
+poll.data.ct2010<-data.frame(ct2010=ct2010$zcta, int.data, int.data.bc, int.data.no2, int.data.o3)
+
+keep.var<-c("ct2010", "PM.17", "BC.17", "NO2.17", "O3.17")
+
+poll.ct2010.17<-poll.data.ct2010[,keep.var]
+rm(int.data, int.data.bc, int.data.no2, int.data.o3)
+
+int.data<-raster::extract(pm2018, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.bc<-raster::extract(bc2018, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.no2<-raster::extract(no22018, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+int.data.o3<-raster::extract(o32018, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+
+colnames(int.data)<-c("ID", "PM.18")
+colnames(int.data.bc)<-c("ID", "BC.18")
+colnames(int.data.no2)<-c("ID", "NO2.18")
+colnames(int.data.o3)<-c("ID", "O3.18")
+
+poll.data.ct2010<-data.frame(ct2010=ct2010$zcta, int.data, int.data.bc, int.data.no2, int.data.o3)
+
+keep.var<-c("ct2010", "PM.18", "BC.18", "NO2.18", "O3.18")
+
+poll.ct2010.18<-poll.data.ct2010[,keep.var]
+
+int.data<-raster::extract(pm2019, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.bc<-raster::extract(bc2019, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.no2<-raster::extract(no22019, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+int.data.o3<-raster::extract(o32019, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+
+colnames(int.data)<-c("ID", "PM.19")
+colnames(int.data.bc)<-c("ID", "BC.19")
+colnames(int.data.no2)<-c("ID", "NO2.19")
+colnames(int.data.o3)<-c("ID", "O3.19")
+
+poll.data.ct2010<-data.frame(ct2010=ct2010$zcta, int.data, int.data.bc, int.data.no2, int.data.o3)
+
+keep.var<-c("ct2010", "PM.19", "BC.19", "NO2.19", "O3.19")
+
+poll.ct2010.19<-poll.data.ct2010[,keep.var]
+
+rm(int.data, int.data.bc, int.data.no2, int.data.o3)
+
+int.data<-raster::extract(pm2020, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.bc<-raster::extract(bc2020, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+int.data.no2<-raster::extract(no22020, ct2010, small = TRUE, fun = mean, na.rm=TRUE, df = TRUE)
+int.data.o3<-raster::extract(o32020, ct2010, small = TRUE, fun = mean, na.rm = TRUE, df = TRUE)
+
+colnames(int.data)<-c("ID", "PM.20")
+colnames(int.data.bc)<-c("ID", "BC.20")
+colnames(int.data.no2)<-c("ID", "NO2.20")
+colnames(int.data.o3)<-c("ID", "O3.20")
+
+poll.data.ct2010<-data.frame(ct2010=ct2010$zcta, int.data, int.data.bc, int.data.no2, int.data.o3)
+
+keep.var<-c("ct2010", "PM.20", "BC.20", "NO2.20", "O3.20")
+
+poll.ct2010.20<-poll.data.ct2010[,keep.var]
+
+#poll.int<-merge(poll.ct2010.18, merge(poll.ct2010.17, merge(poll.ct2010.16, merge(poll.ct2010.15, merge(poll.ct2010.14, merge(poll.ct2010.13, merge(poll.ct2010.12, merge(poll.ct2010.11, merge(poll.ct2010.09, poll.ct2010.10, by="ct2010"), by="ct2010"), by="ct2010"), by="ct2010"), by="ct2010"), by="ct2010"), by="ct2010"), by="ct2010"), by="ct2010")
+
+
+```
+
+### Merge and Export
+
+merge all pollution-year files and save
+```{r}
+final.poll.data<- list(poll.ct2010.09, poll.ct2010.10, poll.ct2010.11, poll.ct2010.12, poll.ct2010.13, poll.ct2010.14, poll.ct2010.15, poll.ct2010.16, poll.ct2010.17, poll.ct2010.18, poll.ct2010.19, poll.ct2010.20) %>% reduce(left_join, by="ct2010")
+
+
+write.csv(final.poll.data, file="C:/Users/js5406/Documents/AirPoll_nyczcta_v2.csv")
+```
+
+
+
