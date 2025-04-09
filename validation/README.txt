@@ -2,8 +2,7 @@ This folder contains documents used to support the comparison of INSIGHT COVID p
 
 Files and descriptions are listed below.
 
-* Data Dictionary for Institutions.xlsx: File contains sample Crosswalk Data Dictionary. Created for institutions to see how their variables align with each other and with standard column names used in cross-institutional analyses
-								  	   Showing Mount Sinai as example
+* Data Dictionary for Institutions.xlsx: File contains sample Crosswalk Data Dictionary. Created for institutions to see how their variables align with each other and with standard column names used in cross-institutional analyses. Showing Mount Sinai as example
 
 * Mock Insitutional Data.csv: File is mockdataset to illustrate common column headers and use to test-run code that should be applied to institutional data.
 
