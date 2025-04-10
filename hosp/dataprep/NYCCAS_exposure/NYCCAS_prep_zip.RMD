@@ -350,7 +350,7 @@ merge all pollution-year files and save
 final.poll.data<- list(poll.ct2010.09, poll.ct2010.10, poll.ct2010.11, poll.ct2010.12, poll.ct2010.13, poll.ct2010.14, poll.ct2010.15, poll.ct2010.16, poll.ct2010.17, poll.ct2010.18, poll.ct2010.19, poll.ct2010.20) %>% reduce(left_join, by="ct2010")
 
 
-write.csv(final.poll.data, file="C:/Users/js5406/Documents/AirPoll_nyczcta_v2.csv")
+write.csv(final.poll.data, file="C:/Users/js5406/Documents/AirPoll_nyczcta.csv")
 ```
 
 
