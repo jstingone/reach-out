@@ -8,4 +8,4 @@ analysis: descriptives, modelling, and visualizations
 
 Within each folder, we have further distinguished between inpatient populations and emergency department populations.
 
-NOTE: Preparation of the neighborhood environmental vulnerability index is not included here, but is available within its GitHub Repository. Link is in the main README file.
+NOTE: Preparation of the neighborhood environmental vulnerability index is not included here, but is available within its GitHub Repository. Final data dictionary is included in dataprep folder. Link to data and programming code is in the main README file.
