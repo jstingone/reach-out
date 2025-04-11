@@ -1,0 +1,99 @@
+---
+title: "Explore test rate by zip code from 08/08/2020 to 02/27/2021"
+author: "Jiaxin Wu & Rachel Li"
+date: "2023-05-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dygraphs)
+library(xts)
+```
+
+## Read data
+```{r load data}
+setwd("C:/Users/js5406/OneDrive - cumc.columbia.edu/HEI Proposal/INSIGHT")
+data = read.csv("./testrate-by-modzcta.csv") %>% mutate(week_ending = mdy(week_ending))
+
+```
+
+## Summary table of mean, median, and range for each zip code
+```{r}
+zip_summary = data %>% 
+  rename_at(8:184 ,function(x) gsub("TESTRATE_", "", x)) %>% 
+  pivot_longer(8:184, names_to = "zip", values_to = "test_rate") %>% 
+  group_by(zip) %>% 
+  summarize(mean = mean(test_rate),
+            median = median(test_rate),
+            min = min(test_rate),
+            max = max(test_rate)) %>% 
+  as.data.frame() %>% 
+  mutate(tertiles = ntile(mean, 3))
+
+#High correlations across all measures (least for min (0.6 but 0.8/0.9 for others))
+numeric.data<-select_if(zip_summary, is.numeric)
+correlations<-cor(numeric.data, method=c("spearman"))
+
+knitr::kable(zip_summary,"simple")
+
+# find the zip codes that have maximum average test rate
+max_zip = zip_summary[which.max(zip_summary[,2]),1]
+max_test = zip_summary[which.max(zip_summary[,2]),2]
+paste(max_zip, "has the highest average testing rate during the time period, with average", max_test, "/week")
+
+# find the zip codes that have minimum average test rate
+min_zip = zip_summary[which.min(zip_summary[,2]),1]
+min_test = zip_summary[which.min(zip_summary[,2]),2]
+paste(min_zip, "has the lowest average testing rate during the time period, with average", min_test, "/week")
+```
+
+## Summary plot for each zip code
+```{r}
+summary_plot <- ggplot(zip_summary, aes(x = zip)) +
+  geom_bar(aes(y = mean), stat = "identity", fill = "steelblue", alpha = 0.7) +
+  geom_errorbar(aes(ymin = min, ymax = max), width = 0.5, color = "black", size = 0.8) +
+  geom_point(aes(y = median), color = "red", size = 2, shape = 18) +
+  labs(title = "Mean, Median, and Range of Testing Data by ZIP Code",
+       x = "ZIP Code",
+       y = "Test Rate") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 65, hjust = 1, vjust = 0.5, size = 5))
+
+print(summary_plot)
+```
+
+## Test rate trend from 08/08/2020 to 02/27/2021 (interactive)
+```{r}
+zip_testrate= data %>% 
+  rename_at(8:184 ,function(x) gsub("TESTRATE_", "", x)) %>% 
+  dplyr::select(-starts_with("TEST")) %>% 
+  pivot_longer(2:178, names_to = "zip", values_to = "test_rate") %>% 
+  mutate(zip = as.factor(zip))
+
+write.csv(zip_testrate, "zip_testrate.csv", row.names = FALSE)
+```
+
+```{r}
+zip_testrate = read.zoo(file = zip_testrate, split = "zip")
+
+dygraph(zip_testrate) %>%
+  dyOptions(labelsUTC = TRUE, fillGraph=F, drawGrid = FALSE) %>%
+  dyRangeSelector() %>%
+  dyCrosshair(direction = "vertical") %>%
+  dyHighlight(highlightCircleSize = 1, highlightSeriesBackgroundAlpha = 0.2, hideOnMouseOut = T)  %>%
+  dyRoller(rollPeriod = 1 )%>%
+  dyLegend(show = "follow")
+```
+
+## Stratify zip codes into tertiles by mean testrates
+```{r}
+test_zip_tertiles = merge(zip_summary, zip_testrate, by="zip")
+  
+write.csv(test_zip_tertiles, "testrate_tertiles.csv", row.names = FALSE)
+```
+
+
+
+

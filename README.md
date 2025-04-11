@@ -15,6 +15,7 @@ Code is organized into folders based on outcomes under study
 * /hosp: Analysis of hospitalization outcomes using harmonized EHR data within the INSIGHT CRN
 * /validation: Demographic Comparison of Institution-Specific Data to INSIGHT CRN
 * /mort: Analysis of Excess Mortality using All-Cause Mortality Records from NYC
+* /publicdata: Programming Code, Datasets and Data Dictionaries associated with Public Data Sources Used within REACH-OUT
 
 
 Links to publications will be added as they become available.
