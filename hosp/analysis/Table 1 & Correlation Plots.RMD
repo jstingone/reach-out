@@ -5,9 +5,12 @@ date: "2024-02-20"
 output: html_document
 ---
 
+# Purpose of the Code
+Create Table 1 for Report and Visualize Correlations between Pollutants and NEVI
+
 # A Run Data Processing Script
 ```{r}
-source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing.R")
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing.R")
 ```
 
 # B Load libraries
@@ -122,7 +125,7 @@ summary(coxph_phase2and3_40cov$score_healthstatus)
 
 # F Run Original Data Processing Script
 ```{r}
-source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing.R")
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing.R")
 ```
 
 # G Import File with NEVI & AP Averages (2009-2019) by NYC Zip Code

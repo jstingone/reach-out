@@ -8,6 +8,9 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+# Purpose of Program
+To generate visualizations of spatial and temporal distribution of cases and outcomes
+
 
 # A Run Data Processing Script
 ```{r}

@@ -13,20 +13,18 @@ library(lmtest)
 
 knitr::opts_chunk$set(echo = TRUE)
 ```
-# Instructions for Creating Needed Code
+# Purpose of Code
 
-Initial code for one outcome, one pollutant during Phase1 is included below. We need crude models for the rest of th pollutants, phases and subsets. Then, they will need to be compiled into a Table for the Supplement.
+This code will perform modelling across populations, air pollutants and outcomes. Models include fully adjusted models, models testing interaction terms between exposure and nevi and then, stratifying results by tertile of NEVI to get stratum specific estimates.
 
-Using the example code, you can cut/paste and replace the pollutant, dataset and rename output objects so that all can be output together into a file.
-
-1. Need to copy code and replace dataset for different phases and different subsets. Datasets are 
+1. Need different phases and different subsets. Datasets are 
 
 coxph_phase1_df: Phase 1, full population
 coxph_phase2and3_df: Phase 23, full population
 coxph_phase1_40cov: Phase 1, 40% subset
 coxph_phase2and3_40cov: Phase 2 and 3 40%subset
 
-2. Need to copy code and replace pollutant variable so there is one set for each of four pollutants. Variable names are:
+2. Need one set for each of four pollutants. Variable names are:
 bc_avg2
 no2_avg5
 pm_avg1
@@ -43,6 +41,7 @@ Remember the final object that stores the RR and CI for a given model should inc
 
 
 #A Run Data Processing Script
+Enter correct path
 ```{r}
 source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing.R")
 ```
@@ -120,6 +119,7 @@ output <- calculate_adj_model_int("ards", "no2_avg5", coxph_phase1_df)
 
 ## Running for all combinations 
 
+Function requires user input of phases, pollutants and outcomes
 Note that results match original models run without functions
 ```{r}
 result_df <- data.frame(PhaseData = character(),
@@ -223,7 +223,7 @@ Matches original output 2/12
 ```
 
 ## Running for all combinations 
-
+Function requires user input of phases, pollutants and outcomes
 ```{r}
 result_df_s <- data.frame(PhaseData = character(),
                         Outcome = character(),
@@ -258,9 +258,9 @@ result_df_s
 
 
 ## Run Models for Dialysis (Requires different population, excluding those who had received dialysis previously)
-
+Function requires user input of phases, pollutants and outcomes
 ```{r}
-source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing2.R")
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing2.R")
 
 result_df_d <- data.frame(PhaseData = character(),
                         Outcome = character(),

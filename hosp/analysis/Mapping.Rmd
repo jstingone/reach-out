@@ -1,7 +1,12 @@
 ---
 title: "Mapping"
+author: "Mehr Shafiq w/additions from JAS"
+date: "2024-02-01"
 output: word_document
 ---
+
+# Purpose of Code
+Using output from Descriptives.RMD, create maps for visualization of spatial distribution of COVID cases within the INSIGHT repository
 
 ```{r setup, include=FALSE}
 library(tidyverse)
@@ -25,6 +30,7 @@ theme_set(theme_minimal() + theme(legend.position = "bottom"))
 ```
 
 # Loading shapefile for NYC zipcodes
+Requires user input of path to Shapefile used for mapping
 
 ```{r, echo = FALSE, warning = FALSE, message = FALSE, include = F}
 zip_codes <- st_read("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/MODZCTA_2010.shp") %>% 

@@ -9,15 +9,16 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+# R Markdown
 
 Program for analysis of ED data to determine risk of being hospitalized
 
-#A Run Data Processing Script
+# A Run Data Processing Script
 ```{r}
 source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing ED.RMD")
 ```
 
+# B Create Functions
 ```{r functions}
 
 calculate_crude_model <- function(outcome, pollutant, phase_data) {
@@ -99,8 +100,9 @@ result[[2]]<-test_interaction
 ```
 
 
-## Running for all combinations 
+## C Running for all combinations 
 
+Functions require user input for populations and pollutants. Only running for one outcomes (hosp)
 Note that results match original models run without functions
 ```{r}
 crude_result_df <- data.frame(PhaseData = character(),

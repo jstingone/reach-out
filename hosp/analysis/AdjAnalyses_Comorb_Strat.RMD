@@ -13,18 +13,17 @@ library(lmtest)
 
 knitr::opts_chunk$set(echo = TRUE)
 ```
-# Instructions for Creating Needed Code
+# Purpose of Code
+Assess relationship between air pollution and COVID within strata defined by key subpopulation characteristics (age, race, ethnicity) and comorbidities. Subpopulation Analyses only run for Phase 1 40% Subset, so don't need to loop through populations.
 
-Subpopulation Analyses only run for Phase 1 40% Subset
 
-
-2. Need to  replace pollutant variable so there is one set for each of four pollutants. Variable names are:
+1. Need to  replace pollutant variable so there is one set for each of four pollutants. Variable names are:
 bc_avg2
 no2_avg5
 pm_avg1
 o3_avg1
 
-3. Need to repeat code for each outcome. Outcomes are:
+2. Need to repeat code for each outcome. Outcomes are:
 ards
 dialysis
 pneumo
@@ -39,7 +38,7 @@ Adding stratified models for comorbidities
 
 #A Run Data Processing Script
 ```{r}
-source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing.R")
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing.R")
 ```
 
 ## Function 1
@@ -127,6 +126,7 @@ calculate_adj_model_strat_asthma <- function(outcome, pollutant, phase_data) {
 
 ## Running for all combinations 
 
+Function requires user input of pollutants and outcomes
 Note that results match original models run without functions-JAS
 ```{r}
 
@@ -344,7 +344,7 @@ calculate_adjsurvival_strat_hyper <- function(duration, outcome, pollutant, phas
 
 
 ## Running for all combinations 
-
+Function requires user input of pollutants and outcomes
 ```{r}
 result_df_s <- data.frame(PhaseData = character(),
                         Outcome = character(),
@@ -473,8 +473,9 @@ result_df_diab_s
 
 ## Run Models for Dialysis (Requires different population, excluding those who had received dialysis previously)
 
+Function requires user input of pollutants and outcomes
 ```{r}
-source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing2.R")
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing2.R")
 
 result_df_d <- data.frame(PhaseData = character(),
                         Outcome = character(),

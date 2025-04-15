@@ -9,11 +9,17 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+#Purpose of Code
+
+Construct adjusted models that mutually adjust for two pollutants. Due to high correlations between pollutants, only run with ozone as second pollutant
+
+
 # A Run Data Processing Script
 ```{r}
-source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing.R")
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing.R")
 ```
 
+# B Function
 
 ```{r models}
 calculate_adj_model_multipoll <- function(outcome, pollutant1, pollutant2, phase_data) {
@@ -44,11 +50,13 @@ calculate_adj_model_multipoll <- function(outcome, pollutant1, pollutant2, phase
   return(result.2)
 }
 
+#check
 #output<-calculate_adj_model_multipoll("ards", "pm_avg1", "o3_avg1", coxph_phase1_40cov)
 
 ```
 
-Run for combinations
+# C Run for combinations
+Note calls to functions require user input of phases, pollutants and outcomes.
 
 ```{r}
 result_df <- data.frame(PhaseData = character(),
@@ -81,7 +89,7 @@ result_df
 ```
 
 
-## Function for Survival Outcomes
+# D Function for Survival Outcomes
 
 ```{r}
 calculate_adjsurvival_model_multipoll <- function(duration, outcome, pollutant1, pollutant2, phase_data) {
@@ -117,7 +125,8 @@ output<-calculate_adjsurvival_model_multipoll("hospital_days", "death", "no2_avg
  
 ```
 
-##Running all combinations
+# E Running all combinations
+Note calls to functions require user input of phases, pollutants and outcomes.
 
 ```{r}
 result_df_s <- data.frame(PhaseData = character(),
@@ -152,10 +161,10 @@ for (phase in 1:length(phases_data)) {
 result_df_s
 ```
 
-Run for diabetes
-
+#F Run for diabetes
+Note calls to functions require user input of phases, pollutants and outcomes.
 ```{r}
-source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Kannoth/Programs/Final Code/Data Processing2.R")
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing2.R")
 
 result_df_d <- data.frame(PhaseData = character(),
                         Outcome = character(),
