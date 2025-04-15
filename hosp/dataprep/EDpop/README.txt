@@ -2,7 +2,8 @@ This folder contains programming code related to data preparation for the emerge
 
 All files are listed below with brief descriptions
 
-Insight_COVID_ED_Population_final.SAS: Code to construct the emergency department population within INSIGHT
+* Insight_COVID_ED_Population_final.SAS: SAS Program to Create Emergency Department Population for Subsequent Analyses. Uses Input Files provided by INSIGHT, as well as air pollution and NEVI estimates provided in publicdata folder
 
-Data Processing ED.RMD: Code to clean and create derived variables
+
+* Data Processing ED.RMD: R Script Called to within Analytic Programs to Clean Data and Derive Analytic Variables.
 
