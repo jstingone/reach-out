@@ -7,6 +7,7 @@ Data sources used within the project include:
 * Neighborhood Environmental Vulnerability Index (public and accessible repo at https://github.com/jstingone/nevi). Contains reference to:
 	* US Census Data (public)
 	* CDC Places Project data (public and accessible at https://cdc.gov/places/index.html)
+ * Publicly-available New York City Community Air Survey (NYCCAS) Data (public and accessible at : https://data.cityofnewyork.us/Environment/NYCCAS-Air-Pollution-Rasters/q68s-8qxv/about_data)
 * Hospitalization data from the INSIGHT Clinical Research Network (https://insightcrn.org/ for access procedures)
 * All-Cause Mortality data from NYC Department of Health and Mental Hygiene ( https://www.nyc.gov/site/doh/data/data-sets/data-requests-application-process-for-identifiable-vital-statistics-data.page for access procedures)
 
