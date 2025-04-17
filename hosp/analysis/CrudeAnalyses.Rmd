@@ -1,0 +1,208 @@
+---
+title: "Crude Analyses"
+author: "Mehr Shafiq w/ additions by JAS"
+date: "2024-01-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# install.packages("sandwich")
+# install.packages("lmtest")
+library(sandwich)
+library(lmtest)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Purpose of Code
+
+The following code constructs crude models for pollutants, phases and subsets. 
+
+1. Populations are 
+
+coxph_phase1_df: Phase 1, full population
+coxph_phase2and3_df: Phase 23, full population
+coxph_phase1_40cov: Phase 1, 40% subset
+coxph_phase2and3_40cov: Phase 2 and 3 40%subset
+
+2. Variable names for pollutants are:
+bc_avg2
+no2_avg5
+pm_avg1
+o3_avg1
+
+3. Outcomes are:
+ards
+dialysis
+pneumo
+vent
+
+Remember the final object that stores the RR and CI for a given model should include the pollutant, outcome and phase/population so that later we can combine them all into a table.
+*** 
+
+
+#A Run Data Processing Script
+User Input for Path to Data Processing Script
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing.R")
+```
+
+## Function for Crude Modified Poisson Models
+
+```{r}
+calculate_crude_model <- function(outcome, pollutant, phase_data) {
+  # Fit Poisson regression model
+  model <- glm(formula(paste(outcome, "~", pollutant)), 
+               data = phase_data, 
+               family = poisson(link = "log"))
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model, vcov = sandwich)[, 1])
+  CI <- exp(confint(coeftest(model, vcov = sandwich)))
+  
+  # Create a data frame with RR and CIs
+  result <- as.data.frame(cbind(RR, CI))
+  result <- cbind(as.data.frame(rownames(result)), result)
+  names(result)[2] <- "RR"
+  
+  return(result)
+}
+```
+
+## Running for all combinations 
+
+```{r}
+result_df <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+phases_data = c("coxph_phase1_df", "coxph_phase2and3_df", "coxph_phase1_40cov", "coxph_phase2and3_40cov")
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1")
+outcomes = c("ards", "pneumo", "vent") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(phases_data[phase])
+      output <- calculate_crude_model(outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df <- rbind(result_df, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[2, "RR"],
+                                               lower_95CI = output[2, "2.5 %"],
+                                               upper_95CI = output[2, "97.5 %"]))
+    }
+  }
+}
+
+result_df
+```
+
+## Function for Survival Outcomes
+
+```{r}
+calculate_survival_model <- function(duration, outcome, pollutant, phase_data) {
+  # Fit Survival model
+  phase_data$Survial_outcome = Surv(phase_data[[duration]], phase_data[[outcome]])
+  model <- coxph(formula(paste("Surv(", duration, ", ", outcome, ") ~", pollutant)), 
+               data = phase_data, 
+               ties = "breslow")
+  
+  # Store coefficients and CIs
+  RR <- exp(coeftest(model))
+  CI <- exp(confint(model))
+  
+  # Create a data frame with RR and CIs
+  result <- as.data.frame(cbind(RR, CI))
+  result <- cbind(as.data.frame(rownames(result)), result)
+  names(result)[2] <- "RR"
+  
+  return(result)
+}
+```
+
+## Running for all combinations 
+
+```{r}
+result_df_s <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+phases_data = c("coxph_phase1_df", "coxph_phase2and3_df", "coxph_phase1_40cov", "coxph_phase2and3_40cov")
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1") 
+duration = "hospital_days"
+outcomes = c("discharge", "death") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(phases_data[phase])
+      output <- calculate_survival_model(duration, outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_s <- rbind(result_df_s, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output$RR,
+                                               lower_95CI = output$`2.5 %`,
+                                               upper_95CI = output$`97.5 %`))
+    }
+  }
+}
+
+result_df_s
+```
+
+## Run Crude Models for Dialysis (Requires different population, excluding those who had received dialysis previously)
+
+```{r}
+source("L:/dcore-prj0131-SHARED/dcore-prj0131-Stingone/INSIGHT_Jeanette_final/Data Processing2.R")
+
+result_df_d <- data.frame(PhaseData = character(),
+                        Outcome = character(),
+                        Pollutant = character(),
+                        RR = numeric(),
+                        lower_95CI = numeric(), 
+                        upper_95CI = numeric(),
+                        stringsAsFactors = FALSE)
+
+phases_data = c("coxph_phase1_df", "coxph_phase2and3_df", "coxph_phase1_40cov", "coxph_phase2and3_40cov")
+pollutants = c("bc_avg2", "no2_avg5", "pm_avg1", "o3_avg1")
+outcomes = c("dialysis") 
+
+for (phase in 1:length(phases_data)) {
+  for (outcome in 1:length(outcomes)) {
+    for (pollutant in 1:length(pollutants)) {
+      data = get(phases_data[phase])
+      output <- calculate_crude_model(outcomes[outcome], pollutants[pollutant], data)
+      
+      result_df_d <- rbind(result_df_d, data.frame(PhaseData = phases_data[phase],
+                                               Outcome = outcomes[outcome],
+                                               Pollutant = pollutants[pollutant],
+                                               RR = output[2, "RR"],
+                                               lower_95CI = output[2, "2.5 %"],
+                                               upper_95CI = output[2, "97.5 %"]))
+    }
+  }
+}
+
+result_df_d
+```
+
+
+
+## Export in excel workbook
+
+```{r}
+require(openxlsx)
+list_dataframes <- list("crude_poisson" = result_df, "crude_poisson_dial" = result_df_d, "crude_survival"=result_df_s)
+write.xlsx(list_dataframes, file = "Crude_Poisson_results.xlsx")
+```
+

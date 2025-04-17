@@ -20,6 +20,10 @@ All files with brief descriptions are listed below.
 
 * EDAdjAnalysesInt.RMD:R Markdown document that creates function for running adjusted models of association between air pollution and hospitalization after ED visit, testing for interaction between air pollutant and NEVI and obtaining straum-specific estimates of air pollution associations within strata of NEVI
 
+* CategoricalPoll Analyses.RMD: R Markdown document that creates function for running adjusted models when air pollution data is operationalized as a categorical variable
+
+* NEVIDomains Analysis.RMD: R Markdown document that creates function for running adjusted models using indiviual NEVI domains rather than overall index
+
 
 
 
